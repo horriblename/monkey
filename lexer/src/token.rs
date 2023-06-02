@@ -16,28 +16,28 @@ pub struct Token {
 // NOTE: might bite me in the ass later: rewrote TokenType as an enum
 #[derive(Debug, PartialEq)]
 pub enum TokenType {
-    ILLEGAL,
+    Illegal,
     EOF,
 
     // Identifiers + literals,
-    IDENT,
-    INT,
+    Ident,
+    Int,
 
     // Operators,
-    ASSIGN,
-    PLUS,
+    Assign,
+    Plus,
 
     // Delimiters,
-    COMMA,
-    SEMICOLON,
+    Comma,
+    Semicolon,
 
-    LPAREN,
-    RPAREN,
-    LBRACE,
-    RBRACE,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
 
-    FUNCTION,
-    LET,
+    Function,
+    Let,
 }
 
 // pub type TokenType = str;
