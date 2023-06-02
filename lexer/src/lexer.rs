@@ -156,21 +156,6 @@ impl Lexer {
             .expect("unreachable: all chars are digits")
     }
 
-    fn read_to_endline(&mut self) -> String {
-        let position = self.position;
-        while self.char.is_some() && self.char.unwrap() == b'\n' {
-            self.read_char();
-        }
-
-        // skip possible line feed
-        if let Some(b'\r') = self.peek_char() {
-            self.read_char();
-        }
-
-        return String::from_utf8(self.input[position as usize..(self.position) as usize].to_vec())
-            .expect("TODO");
-    }
-
     fn skip_whitespace(&mut self) {
         while self.char.is_some() && self.char.unwrap().is_ascii_whitespace() {
             self.read_char();
