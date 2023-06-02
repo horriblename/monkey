@@ -43,6 +43,12 @@ impl Lexer {
             Some(b')') => new_token(TokenType::RParen, ')'),
             Some(b',') => new_token(TokenType::Comma, ','),
             Some(b'+') => new_token(TokenType::Plus, '+'),
+            Some(b'-') => new_token(TokenType::Minus, '-'),
+            Some(b'*') => new_token(TokenType::Asterisk, '*'),
+            Some(b'/') => new_token(TokenType::Slash, '/'),
+            Some(b'!') => new_token(TokenType::Bang, '!'),
+            Some(b'<') => new_token(TokenType::LessThan, '<'),
+            Some(b'>') => new_token(TokenType::GreaterThan, '>'),
             Some(b'{') => new_token(TokenType::LBrace, '{'),
             Some(b'}') => new_token(TokenType::RBrace, '}'),
             Some(ch) if ch.is_ascii_digit() => {
@@ -59,7 +65,7 @@ impl Lexer {
                 };
             }
             Some(_) => Token {
-                token_type: TokenType::ILLEGAL,
+                token_type: TokenType::Illegal,
                 literal: "".to_string(),
             },
             None => Token {
@@ -162,6 +168,8 @@ mod tests {
             };
 
             let result = add(five, ten);
+            !-/*5;
+            5 < 10 > 5;
             ";
 
         struct Expected {
@@ -207,10 +215,19 @@ mod tests {
             expect(Ident, "ten"),
             expect(RParen, ")"),
             expect(Semicolon, ";"),
-            Expected {
-                tok_type: TokenType::EOF,
-                literal: "",
-            },
+            expect(Bang, "!"),
+            expect(Minus, "-"),
+            expect(Slash, "/"),
+            expect(Asterisk, "*"),
+            expect(Int, "5"),
+            expect(Semicolon, ";"),
+            expect(Int, "5"),
+            expect(LessThan, "<"),
+            expect(Int, "10"),
+            expect(GreaterThan, ">"),
+            expect(Int, "5"),
+            expect(Semicolon, ";"),
+            expect(EOF, ""),
         ];
 
         let mut lexer = Lexer::new(input.to_string());
