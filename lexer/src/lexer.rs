@@ -7,7 +7,7 @@ use crate::token::{Token, TokenType};
 
 // NOTE: would probably be easier to turn input into char iterator
 #[derive(Debug)]
-struct Lexer {
+pub struct Lexer {
     // NOTE: the book ignores utf-8 stuff; to match it as much as possible, I'm using u8, will
     // possibly rewrite later
     input: Vec<u8>,
