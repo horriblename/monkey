@@ -89,6 +89,10 @@ impl Lexer {
         self.read_position += 1;
     }
 
+    fn peek_char(&self) -> u8 {
+        self.input[self.read_position as usize]
+    }
+
     fn read_identifier(&mut self) -> String {
         let position = self.position;
 
@@ -99,8 +103,10 @@ impl Lexer {
 
         // why can't I use slice??
         // self.input[position .. self.position]
-        self.copy_token_into_new_string(position as usize, self.position as usize)
-            .expect("unreachable: all chars are alphabets")
+        String::from_utf8(
+            self.input[position as usize..(self.position - position) as usize].to_vec(),
+        )
+        .expect("unreachable: all chars are valid alphabets")
     }
 
     fn lookup_ident(ident: &str) -> TokenType {
@@ -118,8 +124,10 @@ impl Lexer {
             self.read_char();
         }
 
-        self.copy_token_into_new_string(position as usize, self.position as usize)
-            .expect("unreachable: all chars are digits")
+        String::from_utf8(
+            self.input[position as usize..(self.position - position) as usize].to_vec(),
+        )
+        .expect("unreachable: all chars are digits")
     }
 
     fn skip_whitespace(&mut self) {
