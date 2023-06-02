@@ -22,6 +22,11 @@ pub enum TokenType {
     // Identifiers + literals,
     Ident,
     Int,
+    If,
+    Else,
+    Return,
+    True,
+    False,
 
     // Operators,
     Assign,
@@ -30,10 +35,14 @@ pub enum TokenType {
     Asterisk,
     Slash,
     Bang,
-    // Equal,
-    // NotEqual,
+    Equal,
+    NotEqual,
     LessThan,
     GreaterThan,
+
+    // Comments
+    // CommentMarker,
+    // CommentString,
 
     // Delimiters,
     Comma,

@@ -37,7 +37,6 @@ impl Lexer {
         self.skip_whitespace();
 
         let tok = match self.char {
-            Some(b'=') => new_token(TokenType::Assign, '='),
             Some(b';') => new_token(TokenType::Semicolon, ';'),
             Some(b'(') => new_token(TokenType::LParen, '('),
             Some(b')') => new_token(TokenType::RParen, ')'),
@@ -45,12 +44,33 @@ impl Lexer {
             Some(b'+') => new_token(TokenType::Plus, '+'),
             Some(b'-') => new_token(TokenType::Minus, '-'),
             Some(b'*') => new_token(TokenType::Asterisk, '*'),
-            Some(b'/') => new_token(TokenType::Slash, '/'),
-            Some(b'!') => new_token(TokenType::Bang, '!'),
             Some(b'<') => new_token(TokenType::LessThan, '<'),
             Some(b'>') => new_token(TokenType::GreaterThan, '>'),
             Some(b'{') => new_token(TokenType::LBrace, '{'),
             Some(b'}') => new_token(TokenType::RBrace, '}'),
+            Some(b'/') => new_token(TokenType::Slash, '/'),
+            Some(b'!') => {
+                if let Some(b'=') = self.peek_char() {
+                    self.read_char();
+                    Token {
+                        token_type: TokenType::NotEqual,
+                        literal: "!=".to_string(),
+                    }
+                } else {
+                    new_token(TokenType::Bang, '!')
+                }
+            }
+            Some(b'=') => {
+                if let Some(b'=') = self.peek_char() {
+                    self.read_char();
+                    Token {
+                        token_type: TokenType::Equal,
+                        literal: "==".to_string(),
+                    }
+                } else {
+                    new_token(TokenType::Assign, '=')
+                }
+            }
             Some(ch) if ch.is_ascii_digit() => {
                 return Token {
                     token_type: TokenType::Int,
@@ -89,8 +109,13 @@ impl Lexer {
         self.read_position += 1;
     }
 
-    fn peek_char(&self) -> u8 {
-        self.input[self.read_position as usize]
+    /// Peek at the next character. Returns `None` at end of file.
+    fn peek_char(&self) -> Option<u8> {
+        if self.read_position >= self.input.len() as u32 {
+            None
+        } else {
+            Some(self.input[self.read_position as usize])
+        }
     }
 
     fn read_identifier(&mut self) -> String {
@@ -103,16 +128,19 @@ impl Lexer {
 
         // why can't I use slice??
         // self.input[position .. self.position]
-        String::from_utf8(
-            self.input[position as usize..(self.position - position) as usize].to_vec(),
-        )
-        .expect("unreachable: all chars are valid alphabets")
+        String::from_utf8(self.input[position as usize..(self.position) as usize].to_vec())
+            .expect("unreachable: all chars are valid alphabets")
     }
 
     fn lookup_ident(ident: &str) -> TokenType {
         match ident {
             "let" => TokenType::Let,
             "fn" => TokenType::Function,
+            "if" => TokenType::If,
+            "else" => TokenType::Else,
+            "return" => TokenType::Return,
+            "true" => TokenType::True,
+            "false" => TokenType::False,
             _ => TokenType::Ident,
         }
     }
@@ -124,40 +152,31 @@ impl Lexer {
             self.read_char();
         }
 
-        String::from_utf8(
-            self.input[position as usize..(self.position - position) as usize].to_vec(),
-        )
-        .expect("unreachable: all chars are digits")
+        String::from_utf8(self.input[position as usize..(self.position) as usize].to_vec())
+            .expect("unreachable: all chars are digits")
+    }
+
+    fn read_to_endline(&mut self) -> String {
+        let position = self.position;
+        while self.char.is_some() && self.char.unwrap() == b'\n' {
+            self.read_char();
+        }
+
+        // skip possible line feed
+        if let Some(b'\r') = self.peek_char() {
+            self.read_char();
+        }
+
+        return String::from_utf8(self.input[position as usize..(self.position) as usize].to_vec())
+            .expect("TODO");
     }
 
     fn skip_whitespace(&mut self) {
-        while self
-            .char
-            .filter(|&ch| ch == b' ' || ch == b'\t' || ch == b'\n' || ch == b'\r')
-            .is_some()
-        {
+        while self.char.is_some() && self.char.unwrap().is_ascii_whitespace() {
             self.read_char();
         }
 
         assert!(self.char.is_none() || !self.char.unwrap().is_ascii_whitespace());
-    }
-
-    /// helper function to copy a part of token string into a new String. Returns the same result
-    /// as `String::from_utf8`
-    fn copy_token_into_new_string(
-        &self,
-        start: usize,
-        end: usize,
-    ) -> Result<String, std::string::FromUtf8Error> {
-        let token = self
-            .input
-            .iter()
-            .skip(start)
-            .take(end - start)
-            .copied()
-            .collect();
-
-        String::from_utf8(token)
     }
 }
 
@@ -178,6 +197,15 @@ mod tests {
             let result = add(five, ten);
             !-/*5;
             5 < 10 > 5;
+
+            if (5 < 10) {
+                return true;
+            } else {
+                return false;
+            }
+
+            10 == 10;
+            10 != 9;
             ";
 
         struct Expected {
@@ -235,13 +263,39 @@ mod tests {
             expect(GreaterThan, ">"),
             expect(Int, "5"),
             expect(Semicolon, ";"),
+            expect(If, "if"),
+            expect(LParen, "("),
+            expect(Int, "5"),
+            expect(LessThan, "<"),
+            expect(Int, "10"),
+            expect(RParen, ")"),
+            expect(LBrace, "{"),
+            expect(Return, "return"),
+            expect(True, "true"),
+            expect(Semicolon, ";"),
+            expect(RBrace, "}"),
+            expect(Else, "else"),
+            expect(LBrace, "{"),
+            expect(Return, "return"),
+            expect(False, "false"),
+            expect(Semicolon, ";"),
+            expect(RBrace, "}"),
+            expect(Int, "10"),
+            expect(Equal, "=="),
+            expect(Int, "10"),
+            expect(Semicolon, ";"),
+            expect(Int, "10"),
+            expect(NotEqual, "!="),
+            expect(Int, "9"),
+            expect(Semicolon, ";"),
             expect(EOF, ""),
         ];
 
         let mut lexer = Lexer::new(input.to_string());
 
-        for test in tests {
+        for (i, test) in tests.iter().enumerate() {
             let tok = lexer.next_token();
+            println!("test #{}: got token: {}", i, tok.literal);
             assert_eq!(test.tok_type, tok.token_type);
             assert_eq!(test.literal, tok.literal);
         }
