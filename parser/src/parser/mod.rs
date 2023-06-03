@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{cell::RefCell, rc::Rc};
 
 use lexer::{
@@ -95,6 +97,7 @@ impl Parser {
     fn parse_statement(&mut self) -> ast::Statement {
         match self.curr_token.token_type {
             TokenType::Let => ast::Statement::Let(self.parse_let_statement()),
+            TokenType::Return => ast::Statement::Return(self.parse_return_statement()),
             _ => todo!("error handling"),
         }
     }
@@ -114,12 +117,41 @@ impl Parser {
         self.expect_next(TokenType::Assign);
 
         // TODO: we're skipping the expressions until we encounter a semicolon
-        while self.next_token().token_type != TokenType::Semicolon {}
+        while !self.curr_token_is(TokenType::Semicolon) {
+            if self.curr_token_is(TokenType::EOF) {
+                let msg = format!("expected token or semicolon, got {:?}", TokenType::EOF);
+                self.errors.push(ParseError(msg));
+                break;
+            }
+            self.next_token();
+        }
+        self.next_token();
 
         ast::LetStatement {
             token: let_keyword,
             name: name_token,
             value: Rc::new(RefCell::new(ast::Expression::TempDummy)),
+        }
+    }
+
+    fn parse_return_statement(&mut self) -> ast::ReturnStatement {
+        let return_keyword = self.next_token();
+        assert_eq!(return_keyword.token_type, TokenType::Return);
+
+        // TODO: we're skipping the expressions until we encounter a semicolon
+        while !self.curr_token_is(TokenType::Semicolon) {
+            if self.curr_token_is(TokenType::EOF) {
+                let msg = format!("expected token or semicolon, got {:?}", TokenType::EOF);
+                self.errors.push(ParseError(msg));
+                break;
+            }
+            self.next_token();
+        }
+        self.next_token();
+
+        ast::ReturnStatement {
+            token: return_keyword,
+            expr: Rc::new(RefCell::new(ast::Expression::TempDummy)),
         }
     }
 }

@@ -18,6 +18,7 @@ pub enum Node {
 
 pub enum Statement {
     Let(LetStatement),
+    Return(ReturnStatement),
 }
 
 pub enum Expression {
@@ -33,6 +34,8 @@ pub struct LetStatement {
     pub token: Token,
 
     /// left haand side
+    // NOTE: this is Option<_> to make it possible to parse erroneous input without panicing
+    // might make it something else in the future
     pub name: Option<ChildNode<Identifier>>,
 
     /// right hand side
@@ -44,13 +47,7 @@ pub struct Identifier {
     pub value: String, // isn't this the same as `Token.literal`??
 }
 
-// pub fn get_node_token(node: Node) -> Token {
-//     use Expression::*;
-//     use Node::*;
-//     use Statement::*;
-//
-//     match node {
-//         Stmt(Let(n)) => n.token,
-//         Expr(Ident(n)) => n.token,
-//     }
-// }
+pub struct ReturnStatement {
+    pub token: Token,
+    pub expr: ChildNode<Expression>,
+}

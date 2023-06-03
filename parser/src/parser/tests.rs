@@ -1,6 +1,6 @@
 use super::Parser;
-use crate::ast::{self, LetStatement, Statement};
-use lexer::lexer::Lexer;
+use crate::ast::{LetStatement, Statement};
+use lexer::{lexer::Lexer, token::TokenType};
 
 #[test]
 fn test_let_statements() {
@@ -47,18 +47,29 @@ fn test_let_statements() {
 }
 
 #[test]
-fn test_let_statement_error() {
+fn test_return_statements() {
     let input = "
-        let x 5;
-        let = 10;
-        let 838383;
+        return 5;
+        return 10;
+        return 993322;
         "
     .to_string();
+
     let lexer = Lexer::new(input);
     let mut parser = Parser::new(lexer);
-    let _program = parser.parse_program();
 
-    check_parse_errors(&parser)
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    for stmt in program.statements {
+        if let Statement::Return(return_statement) = &stmt {
+            // TODO test return_statement.expr
+            assert_eq!(TokenType::Return, return_statement.token.token_type);
+            assert_eq!("return", return_statement.token.literal);
+        } else {
+            panic!("expected return statemnt, got something else");
+        }
+    }
 }
 
 fn test_let_statement(stmt: &LetStatement, name: &str) -> bool {
