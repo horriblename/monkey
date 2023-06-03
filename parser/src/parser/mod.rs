@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use lexer::{
     lexer::Lexer,
@@ -18,19 +18,36 @@ struct Parser {
     curr_token: Token,
     peek_token: Token,
     errors: Vec<ParseError>,
+
+    // I bet traits can do whatever we're trying here
+    prefix_parse_fns: HashMap<TokenType, Box<PrefixParseFn>>,
+    infix_parse_fns: HashMap<TokenType, Box<InfixParseFn>>,
 }
+
+type PrefixParseFn = dyn Fn() -> ast::Expression;
+
+// takes one argument: the "left side" of the infix operator
+type InfixParseFn = dyn Fn(ast::Expression) -> ast::Expression;
 
 impl Parser {
     pub fn new(mut lexer: Lexer) -> Self {
         let curr_token = lexer.next_token();
         let peek_token = lexer.next_token();
-        Parser {
+        let parser = Parser {
             lexer,
             curr_token,
             peek_token,
             errors: vec![],
-        }
+            prefix_parse_fns: Default::default(),
+            infix_parse_fns: Default::default(),
+        };
+
+        parser
     }
+
+    // fn register_prefix(&mut self, _token_type: TokenType, _f: Box<PrefixParseFn>) {
+    //     // self.prefix_parse_fns.insert(token_type, f);
+    // }
 
     fn next_token(&mut self) -> Token {
         let mut curr = self.lexer.next_token();
@@ -98,7 +115,7 @@ impl Parser {
         match self.curr_token.token_type {
             TokenType::Let => ast::Statement::Let(self.parse_let_statement()),
             TokenType::Return => ast::Statement::Return(self.parse_return_statement()),
-            _ => todo!("error handling"),
+            _ => ast::Statement::Expr(self.parse_expression_statement()),
         }
     }
 
@@ -154,6 +171,62 @@ impl Parser {
             expr: Rc::new(RefCell::new(ast::Expression::TempDummy)),
         }
     }
+
+    fn parse_expression_statement(&mut self) -> ast::ExpressionStatement {
+        let expr = self.parse_expression(OperatorPrecedence::Lowest);
+
+        self.expect_next(TokenType::Semicolon);
+
+        ast::ExpressionStatement { expr }
+    }
+
+    fn parse_expression(&mut self, _precedence: OperatorPrecedence) -> ast::Expression {
+        if let Some(prefix) = self.parse_possible_prefix() {
+            prefix
+        } else {
+            todo!();
+        }
+    }
+
+    // replaces `Parser.prefixParseFns` in the book
+    //
+    // Prefix operators are followed by any expression as an operand
+    fn parse_possible_prefix(&mut self) -> Option<ast::Expression> {
+        match self.curr_token.token_type {
+            TokenType::Ident => Some(ast::Expression::Ident(self.parse_identifier())),
+            TokenType::Int => Some(ast::Expression::Int(self.parse_int())),
+            _ => None,
+        }
+    }
+
+    fn parse_identifier(&mut self) -> ast::Identifier {
+        let token = self.next_token();
+        let value = token.literal.clone();
+
+        ast::Identifier { token, value }
+    }
+
+    fn parse_int(&mut self) -> ast::IntegerLiteral {
+        let token = self.next_token();
+        assert_eq!(token.token_type, TokenType::Int);
+        let value: i64 = token.literal.parse().expect(&format!(
+            "token is type {:?} but could not parse content {} as integer",
+            TokenType::Int,
+            &token.literal
+        ));
+
+        ast::IntegerLiteral { token, value }
+    }
+}
+
+enum OperatorPrecedence {
+    Lowest = 0,
+    Equals = 1,      // ==
+    LessGreater = 2, // > or <
+    Sum = 3,         // +
+    Product = 4,     // *
+    Prefix = 5,      // -X or !X
+    Call = 6,        // myFunction(X)
 }
 
 #[cfg(test)]

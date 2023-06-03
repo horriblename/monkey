@@ -1,5 +1,5 @@
 use super::Parser;
-use crate::ast::{LetStatement, Statement};
+use crate::ast::{Expression, LetStatement, Statement};
 use lexer::{lexer::Lexer, token::TokenType};
 
 #[test]
@@ -87,4 +87,79 @@ fn check_parse_errors(parser: &Parser) {
     }
 
     assert!(parser.errors.is_empty());
+}
+
+#[test]
+fn test_print() {
+    use crate::ast::representation::StringRepr;
+
+    let input = "
+        let x = 5;
+        let y = 10;
+        let foobar = 838383;
+    "
+    .to_string();
+
+    let lexer = Lexer::new(input);
+    let mut parser = Parser::new(lexer);
+
+    let program = parser.parse_program();
+
+    println!("{}", program.string_repr());
+}
+
+#[test]
+fn test_identifier_expression() {
+    let input = "foobar;".to_string();
+
+    let lexer = Lexer::new(input);
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    if program.statements.len() != 1 {
+        panic!(
+            "program has not enough statements, got = {}",
+            program.statements.len()
+        );
+    }
+
+    if let Statement::Expr(expr) = &program.statements[0] {
+        if let Expression::Ident(ident) = &expr.expr {
+            assert_eq!("foobar", ident.value);
+            assert_eq!("foobar", ident.token.literal);
+        } else {
+            panic!("expected Expression::Ident, got {:?}", expr);
+        }
+    } else {
+        panic!("expected ExpressionStatement, got something else");
+    }
+}
+
+#[test]
+fn test_int_expression() {
+    let input = "5;".to_string();
+
+    let lexer = Lexer::new(input);
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    if program.statements.len() != 1 {
+        panic!(
+            "program has not enough statements, got = {}",
+            program.statements.len()
+        );
+    }
+
+    if let Statement::Expr(expr) = &program.statements[0] {
+        if let Expression::Int(integer) = &expr.expr {
+            assert_eq!(5, integer.value);
+            assert_eq!("5", integer.token.literal);
+        } else {
+            panic!("expected Expression::Ident, got {:?}", expr);
+        }
+    } else {
+        panic!("expected ExpressionStatement, got something else");
+    }
 }

@@ -10,27 +10,33 @@ use std::{cell::RefCell, rc::Rc};
 
 type ChildNode<T> = Rc<RefCell<T>>;
 
+#[derive(Debug)]
 pub enum Node {
     // TODO maybe not put Program as a variant, since it's only used "once"
     Stmt(Statement),
     Expr(Expression),
 }
 
+#[derive(Debug)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
     Expr(ExpressionStatement),
 }
 
+#[derive(Debug)]
 pub enum Expression {
     Ident(Identifier),
+    Int(IntegerLiteral),
     TempDummy,
 }
 
+#[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
 
+#[derive(Debug)]
 pub struct LetStatement {
     pub token: Token,
 
@@ -43,26 +49,35 @@ pub struct LetStatement {
     pub value: ChildNode<Expression>,
 }
 
+#[derive(Debug)]
 pub struct Identifier {
     pub token: Token,
     pub value: String, // isn't this the same as `Token.literal`??
 }
 
+#[derive(Debug)]
+pub struct IntegerLiteral {
+    pub token: Token,
+    pub value: i64,
+}
+
+#[derive(Debug)]
 pub struct ReturnStatement {
     pub token: Token,
     pub expr: ChildNode<Expression>,
 }
 
+#[derive(Debug)]
 pub struct ExpressionStatement {
-    expr: Expression,
+    pub expr: Expression,
 }
 
 pub mod representation {
     use std::fmt::Write;
 
     use super::{
-        Expression, ExpressionStatement, Identifier, LetStatement, Node, Program, ReturnStatement,
-        Statement,
+        Expression, ExpressionStatement, Identifier, IntegerLiteral, LetStatement, Node, Program,
+        ReturnStatement, Statement,
     };
 
     pub trait StringRepr {
@@ -102,6 +117,7 @@ pub mod representation {
         fn string_repr(&self) -> String {
             match self {
                 Self::Ident(ident) => ident.string_repr(),
+                Self::Int(integer) => integer.string_repr(),
                 Self::TempDummy => "<TempDummy>".to_string(),
             }
         }
@@ -136,6 +152,12 @@ pub mod representation {
     impl StringRepr for Identifier {
         fn string_repr(&self) -> String {
             self.value.clone()
+        }
+    }
+
+    impl StringRepr for IntegerLiteral {
+        fn string_repr(&self) -> String {
+            self.value.to_string()
         }
     }
 }
