@@ -51,3 +51,86 @@ pub struct ReturnStatement {
     pub token: Token,
     pub expr: ChildNode<Expression>,
 }
+
+pub mod representation {
+    use std::fmt::Write;
+
+    use super::{
+        Expression, ExpressionStatement, Identifier, LetStatement, Node, Program, ReturnStatement,
+        Statement,
+    };
+
+    pub trait StringRepr {
+        fn string_repr(&self) -> String;
+    }
+
+    impl StringRepr for Program {
+        fn string_repr(&self) -> String {
+            let mut buf = String::new();
+            for stmt in &self.statements {
+                write!(&mut buf, "{}\n", stmt.string_repr()).expect("todo");
+            }
+            buf
+        }
+    }
+
+    impl StringRepr for Node {
+        fn string_repr(&self) -> String {
+            match self {
+                Node::Stmt(stmt) => stmt.string_repr(),
+                Node::Expr(expr) => expr.string_repr(),
+            }
+        }
+    }
+
+    impl StringRepr for Statement {
+        fn string_repr(&self) -> String {
+            match self {
+                Self::Let(stmt) => stmt.string_repr(),
+                Self::Return(stmt) => stmt.string_repr(),
+                Self::Expr(stmt) => stmt.string_repr(),
+            }
+        }
+    }
+
+    impl StringRepr for Expression {
+        fn string_repr(&self) -> String {
+            match self {
+                Self::Ident(ident) => ident.string_repr(),
+                Self::TempDummy => "<TempDummy>".to_string(),
+            }
+        }
+    }
+
+    impl StringRepr for LetStatement {
+        fn string_repr(&self) -> String {
+            format!(
+                "{} {} = {};",
+                self.token.literal,
+                self.name
+                    .as_ref()
+                    .and_then(|name| Some(name.as_ref().borrow().string_repr()))
+                    .unwrap_or_else(|| "<None>".to_string()),
+                self.value.as_ref().borrow().string_repr()
+            )
+        }
+    }
+
+    impl StringRepr for ReturnStatement {
+        fn string_repr(&self) -> String {
+            todo!()
+        }
+    }
+
+    impl StringRepr for ExpressionStatement {
+        fn string_repr(&self) -> String {
+            self.expr.string_repr() + ";"
+        }
+    }
+
+    impl StringRepr for Identifier {
+        fn string_repr(&self) -> String {
+            self.value.clone()
+        }
+    }
+}
