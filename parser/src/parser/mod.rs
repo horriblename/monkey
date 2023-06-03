@@ -91,7 +91,7 @@ impl Parser {
     fn add_next_error(&mut self, expected: TokenType) {
         let msg = format!(
             "expected next token to be {:?}, got {:?} instead",
-            expected, self.peek_token.token_type
+            expected, self.curr_token.token_type
         );
         self.errors.push(ParseError(msg));
     }
@@ -173,7 +173,9 @@ impl Parser {
     }
 
     fn parse_expression_statement(&mut self) -> ast::ExpressionStatement {
-        let expr = self.parse_expression(OperatorPrecedence::Lowest);
+        let expr = Rc::new(RefCell::new(
+            self.parse_expression(OperatorPrecedence::Lowest),
+        ));
 
         self.expect_next(TokenType::Semicolon);
 
@@ -184,7 +186,9 @@ impl Parser {
         if let Some(prefix) = self.parse_possible_prefix() {
             prefix
         } else {
-            todo!();
+            // TODO
+            self.next_token();
+            ast::Expression::TempDummy
         }
     }
 
@@ -193,10 +197,27 @@ impl Parser {
     // Prefix operators are followed by any expression as an operand
     fn parse_possible_prefix(&mut self) -> Option<ast::Expression> {
         match self.curr_token.token_type {
+            TokenType::Bang | TokenType::Minus => {
+                Some(ast::Expression::PrefixExpr(self.parse_prefix_expression()))
+            }
             TokenType::Ident => Some(ast::Expression::Ident(self.parse_identifier())),
             TokenType::Int => Some(ast::Expression::Int(self.parse_int())),
             _ => None,
         }
+    }
+
+    fn parse_prefix_expression(&mut self) -> ast::PrefixExpression {
+        let operator = self.next_token();
+        let operand = Rc::new(RefCell::new(
+            self.parse_expression(OperatorPrecedence::Prefix),
+        ));
+
+        ast::PrefixExpression { operator, operand }
+    }
+
+    fn add_no_prefix_parse_fn_error(&mut self, t: TokenType) {
+        let msg = format!("no prefix parse function for {:?} found", t);
+        self.errors.push(ParseError(msg));
     }
 
     fn parse_identifier(&mut self) -> ast::Identifier {

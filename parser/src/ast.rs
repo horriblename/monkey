@@ -28,6 +28,7 @@ pub enum Statement {
 pub enum Expression {
     Ident(Identifier),
     Int(IntegerLiteral),
+    PrefixExpr(PrefixExpression),
     TempDummy,
 }
 
@@ -69,15 +70,21 @@ pub struct ReturnStatement {
 
 #[derive(Debug)]
 pub struct ExpressionStatement {
-    pub expr: Expression,
+    pub expr: ChildNode<Expression>,
+}
+
+#[derive(Debug)]
+pub struct PrefixExpression {
+    pub operator: Token,
+    pub operand: ChildNode<Expression>,
 }
 
 pub mod representation {
     use std::fmt::Write;
 
     use super::{
-        Expression, ExpressionStatement, Identifier, IntegerLiteral, LetStatement, Node, Program,
-        ReturnStatement, Statement,
+        Expression, ExpressionStatement, Identifier, IntegerLiteral, LetStatement, Node,
+        PrefixExpression, Program, ReturnStatement, Statement,
     };
 
     pub trait StringRepr {
@@ -118,6 +125,7 @@ pub mod representation {
             match self {
                 Self::Ident(ident) => ident.string_repr(),
                 Self::Int(integer) => integer.string_repr(),
+                Self::PrefixExpr(expr) => expr.string_repr(),
                 Self::TempDummy => "<TempDummy>".to_string(),
             }
         }
@@ -145,7 +153,7 @@ pub mod representation {
 
     impl StringRepr for ExpressionStatement {
         fn string_repr(&self) -> String {
-            self.expr.string_repr() + ";"
+            self.expr.as_ref().borrow().string_repr() + ";"
         }
     }
 
@@ -158,6 +166,16 @@ pub mod representation {
     impl StringRepr for IntegerLiteral {
         fn string_repr(&self) -> String {
             self.value.to_string()
+        }
+    }
+
+    impl StringRepr for PrefixExpression {
+        fn string_repr(&self) -> String {
+            format!(
+                "{}{}",
+                self.operator.literal,
+                self.operand.borrow().string_repr()
+            )
         }
     }
 }

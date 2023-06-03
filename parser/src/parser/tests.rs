@@ -2,6 +2,16 @@ use super::Parser;
 use crate::ast::{Expression, LetStatement, Statement};
 use lexer::{lexer::Lexer, token::TokenType};
 
+macro_rules! unwrap_variant {
+    ($target: expr, $pat: path) => {{
+        if let $pat(a) = $target {
+            a
+        } else {
+            panic!("mismatch variant when cast to {}", stringify!($pat)); // #2
+        }
+    }};
+}
+
 #[test]
 fn test_let_statements() {
     let input = "
@@ -125,7 +135,7 @@ fn test_identifier_expression() {
     }
 
     if let Statement::Expr(expr) = &program.statements[0] {
-        if let Expression::Ident(ident) = &expr.expr {
+        if let Expression::Ident(ident) = &*expr.expr.borrow() {
             assert_eq!("foobar", ident.value);
             assert_eq!("foobar", ident.token.literal);
         } else {
@@ -153,7 +163,7 @@ fn test_int_expression() {
     }
 
     if let Statement::Expr(expr) = &program.statements[0] {
-        if let Expression::Int(integer) = &expr.expr {
+        if let Expression::Int(integer) = &*expr.expr.borrow() {
             assert_eq!(5, integer.value);
             assert_eq!("5", integer.token.literal);
         } else {
@@ -161,5 +171,48 @@ fn test_int_expression() {
         }
     } else {
         panic!("expected ExpressionStatement, got something else");
+    }
+}
+
+#[test]
+fn test_parsing_prefix_expressions() {
+    struct Test {
+        input: &'static str,
+        operator: &'static str,
+        integer_value: i64,
+    }
+
+    let tests = vec![
+        Test {
+            input: "!5;",
+            operator: "!",
+            integer_value: 5,
+        },
+        Test {
+            input: "-15;",
+            operator: "-",
+            integer_value: 15,
+        },
+    ];
+
+    for t in tests {
+        let lexer = Lexer::new(t.input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parse_errors(&parser);
+
+        assert_eq!(program.statements.len(), 1);
+
+        let stmt = &program.statements[0];
+        let expr = &*unwrap_variant!(stmt, Statement::Expr).expr.borrow();
+
+        let prefix_expr = unwrap_variant!(expr, Expression::PrefixExpr);
+
+        assert_eq!(t.operator, prefix_expr.operator.literal);
+
+        let right_expr = &*prefix_expr.operand.borrow();
+        let rvalue = unwrap_variant!(right_expr, Expression::Int);
+
+        assert_eq!(t.integer_value, rvalue.value);
     }
 }
