@@ -33,7 +33,7 @@ pub struct LetStatement {
     pub token: Token,
 
     /// left haand side
-    pub name: ChildNode<Identifier>,
+    pub name: Option<ChildNode<Identifier>>,
 
     /// right hand side
     pub value: ChildNode<Expression>,

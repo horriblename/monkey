@@ -7,21 +7,26 @@ use lexer::{
 
 use crate::ast;
 
+#[derive(Debug)]
+struct ParseError(String);
+
 struct Parser {
     // TODO reimplement using Lexer.iter(), possibly with Peekable
     lexer: Lexer,
     curr_token: Token,
     peek_token: Token,
+    errors: Vec<ParseError>,
 }
 
 impl Parser {
-    fn new(mut lexer: Lexer) -> Self {
+    pub fn new(mut lexer: Lexer) -> Self {
         let curr_token = lexer.next_token();
         let peek_token = lexer.next_token();
         Parser {
             lexer,
             curr_token,
             peek_token,
+            errors: vec![],
         }
     }
 
@@ -40,7 +45,39 @@ impl Parser {
         self.peek_token.token_type == t
     }
 
-    fn parse_program(&mut self) -> ast::Program {
+    /// `expect_peek` checks if the currently peeked token is the same type as `t`.
+    /// If they are, advance the parser and return `true`, else return `false`.
+    fn _expect_peek(&mut self, t: TokenType) -> bool {
+        if self.peek_token_is(t) {
+            self.next_token();
+            true
+        } else {
+            false
+        }
+    }
+
+    // NOTE: I find `expect_peek` somewhat unintuitive to use, so I opted for something like this
+    // instead
+    fn expect_next(&mut self, t: TokenType) -> Option<Token> {
+        if self.curr_token.token_type == t {
+            Some(self.next_token())
+        } else {
+            self.add_next_error(t);
+            None
+        }
+    }
+
+    // NOTE: I'm getting different errors from the book, most likely due to them checking with
+    // peeks instead of my next_...() calls; moving on until I get more context
+    fn add_next_error(&mut self, expected: TokenType) {
+        let msg = format!(
+            "expected next token to be {:?}, got {:?} instead",
+            expected, self.peek_token.token_type
+        );
+        self.errors.push(ParseError(msg));
+    }
+
+    pub fn parse_program(&mut self) -> ast::Program {
         let mut program = ast::Program { statements: vec![] };
 
         while self.curr_token.token_type != TokenType::EOF {
@@ -49,6 +86,10 @@ impl Parser {
         }
 
         program
+    }
+
+    pub fn get_errors(&self) -> &Vec<ParseError> {
+        &self.errors
     }
 
     fn parse_statement(&mut self) -> ast::Statement {
@@ -62,25 +103,22 @@ impl Parser {
         let let_keyword = self.next_token();
         assert_eq!(let_keyword.token_type, TokenType::Let);
 
-        let variable_name = self.next_token();
-        if variable_name.token_type != (TokenType::Ident) {
-            todo!("error handling");
-        }
-        let variable_literal = variable_name.literal.clone();
+        let name_token = self.expect_next(TokenType::Ident).and_then(|tok| {
+            let literal = tok.literal.clone();
+            Some(Rc::new(RefCell::new(ast::Identifier {
+                token: tok,
+                value: literal,
+            })))
+        });
 
-        if self.next_token().token_type != TokenType::Assign {
-            todo!("error handling");
-        }
+        self.expect_next(TokenType::Assign);
 
         // TODO: we're skipping the expressions until we encounter a semicolon
         while self.next_token().token_type != TokenType::Semicolon {}
 
         ast::LetStatement {
             token: let_keyword,
-            name: Rc::new(RefCell::new(ast::Identifier {
-                token: variable_name,
-                value: variable_literal,
-            })),
+            name: name_token,
             value: Rc::new(RefCell::new(ast::Expression::TempDummy)),
         }
     }
