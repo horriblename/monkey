@@ -177,7 +177,9 @@ impl Parser {
             self.parse_expression(OperatorPrecedence::Lowest),
         ));
 
-        self.expect_next(TokenType::Semicolon);
+        if self.curr_token_is(TokenType::Semicolon) {
+            self.next_token();
+        }
 
         ast::ExpressionStatement { expr }
     }
