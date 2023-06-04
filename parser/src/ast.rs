@@ -31,7 +31,7 @@ pub enum Expression {
     Bool(BooleanLiteral),
     PrefixExpr(PrefixExpression),
     InfixExpr(InfixExpression),
-    TempDummy,
+    MissingExpression,
 }
 
 #[derive(Debug)]
@@ -142,7 +142,7 @@ pub mod representation {
                 Self::Bool(b) => b.string_repr(),
                 Self::PrefixExpr(expr) => expr.string_repr(),
                 Self::InfixExpr(expr) => expr.string_repr(),
-                Self::TempDummy => "<TempDummy>".to_string(),
+                Self::MissingExpression => "<MissingExpression>".to_string(),
             }
         }
     }

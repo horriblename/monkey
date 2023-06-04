@@ -7,7 +7,7 @@ use lexer::{
     token::{Token, TokenType},
 };
 
-use crate::ast;
+use crate::ast::{self, Expression};
 
 #[derive(Debug)]
 struct ParseError(String);
@@ -164,7 +164,7 @@ impl Parser {
         ast::LetStatement {
             token: let_keyword,
             name: name_token,
-            value: Rc::new(RefCell::new(ast::Expression::TempDummy)),
+            value: Rc::new(RefCell::new(ast::Expression::MissingExpression)),
         }
     }
 
@@ -185,7 +185,7 @@ impl Parser {
 
         ast::ReturnStatement {
             token: return_keyword,
-            expr: Rc::new(RefCell::new(ast::Expression::TempDummy)),
+            expr: Rc::new(RefCell::new(ast::Expression::MissingExpression)),
         }
     }
 
@@ -223,7 +223,7 @@ impl Parser {
             return left_expr;
         } else {
             self.add_no_prefix_parse_fn_error(self.curr_token.type_.clone());
-            ast::Expression::TempDummy
+            Expression::MissingExpression
         }
     }
 
@@ -238,11 +238,21 @@ impl Parser {
             TokenType::Bang | TokenType::Minus => {
                 Some(ast::Expression::PrefixExpr(self.parse_prefix_expression()))
             }
+            TokenType::LParen => Some(self.parse_grouped_expression()),
             TokenType::Ident => Some(ast::Expression::Ident(self.parse_identifier())),
             TokenType::Int => Some(ast::Expression::Int(self.parse_int())),
             TokenType::True | TokenType::False => Some(ast::Expression::Bool(self.parse_bool())),
             _ => None,
         }
+    }
+
+    // Parenthesised expressions `(5 + 5)`
+    fn parse_grouped_expression(&mut self) -> ast::Expression {
+        self.next_token();
+        let expr = self.parse_expression(OperatorPrecedence::Lowest);
+        self.expect_next(TokenType::RParen);
+
+        expr
     }
 
     fn parse_prefix_expression(&mut self) -> ast::PrefixExpression {

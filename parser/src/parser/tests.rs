@@ -326,7 +326,7 @@ fn test_parsing_infix_expressions() {
         Test {
             input: "true == true",
             left_value: LiteralValue::Bool(true),
-            operator: "!=",
+            operator: "==",
             right_value: LiteralValue::Bool(true),
         },
     ];
@@ -411,6 +411,7 @@ fn test_operator_precedence_parsing() {
             input: "3 + 4 * 5 == 3 * 1 + 4 * 5",
             expected: "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
         },
+        // Boolean Expressions
         Test {
             input: "true",
             expected: "true",
@@ -426,6 +427,27 @@ fn test_operator_precedence_parsing() {
         Test {
             input: "3 < 5 == true",
             expected: "((3 < 5) == true)",
+        },
+        // Grouped(Parenthesised) Expressions
+        Test {
+            input: "1 + (2 + 3) + 4",
+            expected: "((1 + (2 + 3)) + 4)",
+        },
+        Test {
+            input: "(5 + 5) * 2",
+            expected: "((5 + 5) * 2)",
+        },
+        Test {
+            input: "2 / (5 + 5)",
+            expected: "(2 / (5 + 5))",
+        },
+        Test {
+            input: "-(5 + 5)",
+            expected: "(-(5 + 5))",
+        },
+        Test {
+            input: "!(true == true)",
+            expected: "(!(true == true))",
         },
     ];
 
