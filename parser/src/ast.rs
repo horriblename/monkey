@@ -96,7 +96,7 @@ pub mod representation {
                 .iter()
                 .map(|stmt| stmt.string_repr())
                 .collect::<Vec<_>>()
-                .join("\n")
+                .join("")
         }
     }
 
@@ -152,7 +152,7 @@ pub mod representation {
 
     impl StringRepr for ExpressionStatement {
         fn string_repr(&self) -> String {
-            self.expr.as_ref().borrow().string_repr() + ";"
+            self.expr.as_ref().borrow().string_repr()
         }
     }
 
@@ -171,7 +171,7 @@ pub mod representation {
     impl StringRepr for PrefixExpression {
         fn string_repr(&self) -> String {
             format!(
-                "{}{}",
+                "({}{})",
                 self.operator.literal,
                 self.operand.borrow().string_repr()
             )
