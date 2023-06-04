@@ -100,22 +100,33 @@ fn check_parse_errors(parser: &Parser) {
 }
 
 #[test]
-fn test_print() {
+fn test_string_repr() {
     use crate::ast::representation::StringRepr;
 
-    let input = "
-        let x = 5;
-        let y = 10;
-        let foobar = 838383;
-    "
-    .to_string();
+    let program = Program {
+        statements: vec![Statement::Let(LetStatement {
+            token: Token {
+                token_type: TokenType::Let,
+                literal: "let".to_string(),
+            },
+            name: Some(Rc::new(RefCell::new(Identifier {
+                token: Token {
+                    token_type: TokenType::Ident,
+                    literal: "myVar".to_string(),
+                },
+                value: "myVar".to_string(),
+            }))),
+            value: Rc::new(RefCell::new(Expression::Ident(Identifier {
+                token: Token {
+                    token_type: TokenType::Ident,
+                    literal: "anotherVar".to_string(),
+                },
+                value: "anotherVar".to_string(),
+            }))),
+        })],
+    };
 
-    let lexer = Lexer::new(input);
-    let mut parser = Parser::new(lexer);
-
-    let program = parser.parse_program();
-
-    println!("{}", program.string_repr());
+    assert_eq!("let myVar = anotherVar;", program.string_repr());
 }
 
 #[test]

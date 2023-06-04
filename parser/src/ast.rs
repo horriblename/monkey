@@ -80,7 +80,6 @@ pub struct PrefixExpression {
 }
 
 pub mod representation {
-    use std::fmt::Write;
 
     use super::{
         Expression, ExpressionStatement, Identifier, IntegerLiteral, LetStatement, Node,
@@ -93,11 +92,11 @@ pub mod representation {
 
     impl StringRepr for Program {
         fn string_repr(&self) -> String {
-            let mut buf = String::new();
-            for stmt in &self.statements {
-                write!(&mut buf, "{}\n", stmt.string_repr()).expect("todo");
-            }
-            buf
+            self.statements
+                .iter()
+                .map(|stmt| stmt.string_repr())
+                .collect::<Vec<_>>()
+                .join("\n")
         }
     }
 
