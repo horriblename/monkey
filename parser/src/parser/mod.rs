@@ -231,7 +231,7 @@ impl Parser {
     //
     // Prefix operators are followed by any expression as an operand
     // This name is somewhat misleading imo, should probably rename to something like
-    // parse_expression_with_optional_prefix
+    // parse_literal_with_optional_prefix
     //
     fn parse_possible_prefix(&mut self) -> Option<ast::Expression> {
         match self.curr_token.type_ {
@@ -240,6 +240,7 @@ impl Parser {
             }
             TokenType::Ident => Some(ast::Expression::Ident(self.parse_identifier())),
             TokenType::Int => Some(ast::Expression::Int(self.parse_int())),
+            TokenType::True | TokenType::False => Some(ast::Expression::Bool(self.parse_bool())),
             _ => None,
         }
     }
@@ -294,6 +295,14 @@ impl Parser {
         ));
 
         ast::IntegerLiteral { token, value }
+    }
+
+    fn parse_bool(&mut self) -> ast::BooleanLiteral {
+        let token = self.next_token();
+        assert!(token.type_ == TokenType::True || token.type_ == TokenType::False);
+        let value: bool = token.type_ == TokenType::True;
+
+        ast::BooleanLiteral { token, value }
     }
 
     fn operator_precedence(token_type: &TokenType) -> OperatorPrecedence {

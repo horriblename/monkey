@@ -9,9 +9,11 @@ use lexer::{
     token::{Token, TokenType},
 };
 
+#[derive(Debug)]
 enum LiteralValue {
     Int(i64),
     Str(String),
+    Bool(bool),
 }
 
 type TResult<T> = Result<T, TError>;
@@ -267,59 +269,65 @@ fn test_parsing_prefix_expressions() {
 fn test_parsing_infix_expressions() {
     struct Test {
         input: &'static str,
-        left_value: i64,
+        left_value: LiteralValue,
         operator: &'static str,
-        right_value: i64,
+        right_value: LiteralValue,
     }
 
     let tests = vec![
         Test {
             input: "5 + 5;",
-            left_value: 5,
+            left_value: LiteralValue::Int(5),
             operator: "+",
-            right_value: 5,
+            right_value: LiteralValue::Int(5),
         },
         Test {
             input: "5 - 5;",
-            left_value: 5,
+            left_value: LiteralValue::Int(5),
             operator: "-",
-            right_value: 5,
+            right_value: LiteralValue::Int(5),
         },
         Test {
             input: "5 * 5;",
-            left_value: 5,
+            left_value: LiteralValue::Int(5),
             operator: "*",
-            right_value: 5,
+            right_value: LiteralValue::Int(5),
         },
         Test {
             input: "5 / 5;",
-            left_value: 5,
+            left_value: LiteralValue::Int(5),
             operator: "/",
-            right_value: 5,
+            right_value: LiteralValue::Int(5),
         },
         Test {
             input: "5 > 5;",
-            left_value: 5,
+            left_value: LiteralValue::Int(5),
             operator: ">",
-            right_value: 5,
+            right_value: LiteralValue::Int(5),
         },
         Test {
             input: "5 < 5;",
-            left_value: 5,
+            left_value: LiteralValue::Int(5),
             operator: "<",
-            right_value: 5,
+            right_value: LiteralValue::Int(5),
         },
         Test {
             input: "5 == 5;",
-            left_value: 5,
+            left_value: LiteralValue::Int(5),
             operator: "==",
-            right_value: 5,
+            right_value: LiteralValue::Int(5),
         },
         Test {
             input: "5 != 5;",
-            left_value: 5,
+            left_value: LiteralValue::Int(5),
             operator: "!=",
-            right_value: 5,
+            right_value: LiteralValue::Int(5),
+        },
+        Test {
+            input: "true == true",
+            left_value: LiteralValue::Bool(true),
+            operator: "!=",
+            right_value: LiteralValue::Bool(true),
         },
     ];
 
@@ -338,14 +346,10 @@ fn test_parsing_infix_expressions() {
 
         assert_eq!(test.operator, infix_expr.operator.literal);
         let left_expr = &*infix_expr.left_expr.borrow();
-        let left_value = cast_variant!(left_expr, Expression::Int).unwrap();
-
-        assert_eq!(test.left_value, left_value.value);
+        test_literal_expression(left_expr, &test.left_value).unwrap();
 
         let right_expr = &*infix_expr.right_expr.borrow();
-        let right_value = cast_variant!(right_expr, Expression::Int).unwrap();
-
-        assert_eq!(test.right_value, right_value.value);
+        test_literal_expression(right_expr, &test.right_value).unwrap();
 
         println!("{}", program.string_repr());
     }
@@ -407,6 +411,22 @@ fn test_operator_precedence_parsing() {
             input: "3 + 4 * 5 == 3 * 1 + 4 * 5",
             expected: "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
         },
+        Test {
+            input: "true",
+            expected: "true",
+        },
+        Test {
+            input: "false",
+            expected: "false",
+        },
+        Test {
+            input: "3 > 5 == false",
+            expected: "((3 > 5) == false)",
+        },
+        Test {
+            input: "3 < 5 == true",
+            expected: "((3 < 5) == true)",
+        },
     ];
 
     for test in tests {
@@ -455,10 +475,21 @@ fn test_string_literal(expr: &Expression, value: &str) -> TResult<()> {
     Ok(())
 }
 
+fn test_bool_literal(expr: &Expression, value: &bool) -> TResult<()> {
+    let boolean = cast_variant!(expr, Expression::Bool).or_else(print_error)?;
+
+    check!(boolean.value == *value).or_else(print_error)?;
+
+    check!(boolean.token.literal == value.to_string()).or_else(print_error)?;
+
+    Ok(())
+}
+
 fn test_literal_expression(expr: &Expression, expected: &LiteralValue) -> TResult<()> {
     match expected {
         LiteralValue::Int(n) => test_integer_literal(expr, n),
         LiteralValue::Str(s) => test_string_literal(expr, &s),
+        LiteralValue::Bool(b) => test_bool_literal(expr, b),
     }
 }
 
@@ -477,4 +508,22 @@ fn test_infix_expression(
     test_literal_expression(&*op_expr.right_expr.borrow(), &right)?;
 
     Ok(())
+}
+
+#[test]
+fn test_boolean_literal_expression() {
+    let input = "
+        true;
+        false;
+        let foobar = true;
+        let barfoo = false;
+    "
+    .to_string();
+
+    let lexer = Lexer::new(input);
+    let mut parser = Parser::new(lexer);
+
+    let program = parser.parse_program();
+    assert_eq!(4, program.statements.len());
+    check_parse_errors(&parser);
 }

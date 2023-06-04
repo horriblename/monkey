@@ -28,6 +28,7 @@ pub enum Statement {
 pub enum Expression {
     Ident(Identifier),
     Int(IntegerLiteral),
+    Bool(BooleanLiteral),
     PrefixExpr(PrefixExpression),
     InfixExpr(InfixExpression),
     TempDummy,
@@ -64,6 +65,12 @@ pub struct IntegerLiteral {
 }
 
 #[derive(Debug)]
+pub struct BooleanLiteral {
+    pub token: Token,
+    pub value: bool,
+}
+
+#[derive(Debug)]
 pub struct ReturnStatement {
     pub token: Token,
     pub expr: ChildNode<Expression>,
@@ -90,8 +97,8 @@ pub struct InfixExpression {
 pub mod representation {
 
     use super::{
-        Expression, ExpressionStatement, Identifier, InfixExpression, IntegerLiteral, LetStatement,
-        Node, PrefixExpression, Program, ReturnStatement, Statement,
+        BooleanLiteral, Expression, ExpressionStatement, Identifier, InfixExpression,
+        IntegerLiteral, LetStatement, Node, PrefixExpression, Program, ReturnStatement, Statement,
     };
 
     pub trait StringRepr {
@@ -132,6 +139,7 @@ pub mod representation {
             match self {
                 Self::Ident(ident) => ident.string_repr(),
                 Self::Int(integer) => integer.string_repr(),
+                Self::Bool(b) => b.string_repr(),
                 Self::PrefixExpr(expr) => expr.string_repr(),
                 Self::InfixExpr(expr) => expr.string_repr(),
                 Self::TempDummy => "<TempDummy>".to_string(),
@@ -172,6 +180,12 @@ pub mod representation {
     }
 
     impl StringRepr for IntegerLiteral {
+        fn string_repr(&self) -> String {
+            self.value.to_string()
+        }
+    }
+
+    impl StringRepr for BooleanLiteral {
         fn string_repr(&self) -> String {
             self.value.to_string()
         }
