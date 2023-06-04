@@ -14,7 +14,7 @@ pub struct Token {
 }
 
 // NOTE: might bite me in the ass later: rewrote TokenType as an enum
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     Illegal,
     EOF,

@@ -1,6 +1,13 @@
+use std::{cell::RefCell, rc::Rc};
+
 use super::Parser;
-use crate::ast::{Expression, LetStatement, Statement};
-use lexer::{lexer::Lexer, token::TokenType};
+use crate::ast::{
+    representation::StringRepr, Expression, Identifier, LetStatement, Program, Statement,
+};
+use lexer::{
+    lexer::Lexer,
+    token::{Token, TokenType},
+};
 
 macro_rules! unwrap_variant {
     ($target: expr, $pat: path) => {{
@@ -225,5 +232,162 @@ fn test_parsing_prefix_expressions() {
         let rvalue = unwrap_variant!(right_expr, Expression::Int);
 
         assert_eq!(t.integer_value, rvalue.value);
+    }
+}
+
+#[test]
+fn test_parsing_infix_expressions() {
+    struct Test {
+        input: &'static str,
+        left_value: i64,
+        operator: &'static str,
+        right_value: i64,
+    }
+
+    let tests = vec![
+        Test {
+            input: "5 + 5;",
+            left_value: 5,
+            operator: "+",
+            right_value: 5,
+        },
+        Test {
+            input: "5 - 5;",
+            left_value: 5,
+            operator: "-",
+            right_value: 5,
+        },
+        Test {
+            input: "5 * 5;",
+            left_value: 5,
+            operator: "*",
+            right_value: 5,
+        },
+        Test {
+            input: "5 / 5;",
+            left_value: 5,
+            operator: "/",
+            right_value: 5,
+        },
+        Test {
+            input: "5 > 5;",
+            left_value: 5,
+            operator: ">",
+            right_value: 5,
+        },
+        Test {
+            input: "5 < 5;",
+            left_value: 5,
+            operator: "<",
+            right_value: 5,
+        },
+        Test {
+            input: "5 == 5;",
+            left_value: 5,
+            operator: "==",
+            right_value: 5,
+        },
+        Test {
+            input: "5 != 5;",
+            left_value: 5,
+            operator: "!=",
+            right_value: 5,
+        },
+    ];
+
+    for test in tests {
+        let lexer = Lexer::new(test.input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parse_errors(&parser);
+
+        assert_eq!(1, program.statements.len());
+
+        let stmt = &program.statements[0];
+        let expr_stmt = unwrap_variant!(stmt, Statement::Expr);
+        let expr = &*expr_stmt.expr.borrow();
+        let infix_expr = unwrap_variant!(expr, Expression::InfixExpr);
+
+        assert_eq!(test.operator, infix_expr.operator.literal);
+        let left_expr = &*infix_expr.left_expr.borrow();
+        let left_value = unwrap_variant!(left_expr, Expression::Int);
+
+        assert_eq!(test.left_value, left_value.value);
+
+        let right_expr = &*infix_expr.right_expr.borrow();
+        let right_value = unwrap_variant!(right_expr, Expression::Int);
+
+        assert_eq!(test.right_value, right_value.value);
+
+        println!("{}", program.string_repr());
+    }
+}
+
+#[test]
+fn test_operator_precedence_parsing() {
+    struct Test {
+        input: &'static str,
+        expected: &'static str,
+    }
+
+    let tests = vec![
+        Test {
+            input: "-a * b",
+            expected: "((-a) * b)",
+        },
+        Test {
+            input: "!-a",
+            expected: "(!(-a))",
+        },
+        Test {
+            input: "a + b + c",
+            expected: "((a + b) + c)",
+        },
+        Test {
+            input: "a + b - c",
+            expected: "((a + b) - c)",
+        },
+        Test {
+            input: "a * b * c",
+            expected: "((a * b) * c)",
+        },
+        Test {
+            input: "a * b / c",
+            expected: "((a * b) / c)",
+        },
+        Test {
+            input: "a + b / c",
+            expected: "(a + (b / c))",
+        },
+        Test {
+            input: "a + b * c + d / e - f",
+            expected: "(((a + (b * c)) + (d / e)) - f)",
+        },
+        Test {
+            input: "3 + 4; -5 * 5",
+            expected: "(3 + 4)((-5) * 5)",
+        },
+        Test {
+            input: "5 > 4 == 3 < 4",
+            expected: "((5 > 4) == (3 < 4))",
+        },
+        Test {
+            input: "5 < 4 != 3 > 4",
+            expected: "((5 < 4) != (3 > 4))",
+        },
+        Test {
+            input: "3 + 4 * 5 == 3 * 1 + 4 * 5",
+            expected: "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+        },
+    ];
+
+    for test in tests {
+        let lexer = Lexer::new(test.input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parse_errors(&parser);
+
+        let actual = program.string_repr();
+        assert_eq!(test.expected, actual);
     }
 }
