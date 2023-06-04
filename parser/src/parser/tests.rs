@@ -9,14 +9,42 @@ use lexer::{
     token::{Token, TokenType},
 };
 
-macro_rules! unwrap_variant {
+enum LiteralValue {
+    Int(i64),
+    Str(String),
+}
+
+type TResult<T> = Result<T, TError>;
+#[derive(Debug)]
+struct TError(String);
+
+macro_rules! cast_variant {
     ($target: expr, $pat: path) => {{
         if let $pat(a) = $target {
-            a
+            Ok(a)
         } else {
-            panic!("mismatch variant when cast to {}", stringify!($pat)); // #2
+            Err(TError(format!(
+                "mismatch variant when casting into {} from {:?}",
+                stringify!($pat),
+                $target,
+            )))
         }
     }};
+}
+
+macro_rules! check {
+    ($condition: expr) => {{
+        if $condition {
+            Ok(())
+        } else {
+            Err(TError(format!("check failed: {}", stringify!($condition))))
+        }
+    }};
+}
+
+fn print_error<T>(err: TError) -> TResult<T> {
+    eprintln!("{:?}", err);
+    Err(err)
 }
 
 #[test]
@@ -222,14 +250,14 @@ fn test_parsing_prefix_expressions() {
         assert_eq!(program.statements.len(), 1);
 
         let stmt = &program.statements[0];
-        let expr = &*unwrap_variant!(stmt, Statement::Expr).expr.borrow();
+        let expr = &*cast_variant!(stmt, Statement::Expr).unwrap().expr.borrow();
 
-        let prefix_expr = unwrap_variant!(expr, Expression::PrefixExpr);
+        let prefix_expr = cast_variant!(expr, Expression::PrefixExpr).unwrap();
 
         assert_eq!(t.operator, prefix_expr.operator.literal);
 
         let right_expr = &*prefix_expr.operand.borrow();
-        let rvalue = unwrap_variant!(right_expr, Expression::Int);
+        let rvalue = cast_variant!(right_expr, Expression::Int).unwrap();
 
         assert_eq!(t.integer_value, rvalue.value);
     }
@@ -304,18 +332,18 @@ fn test_parsing_infix_expressions() {
         assert_eq!(1, program.statements.len());
 
         let stmt = &program.statements[0];
-        let expr_stmt = unwrap_variant!(stmt, Statement::Expr);
+        let expr_stmt = cast_variant!(stmt, Statement::Expr).unwrap();
         let expr = &*expr_stmt.expr.borrow();
-        let infix_expr = unwrap_variant!(expr, Expression::InfixExpr);
+        let infix_expr = cast_variant!(expr, Expression::InfixExpr).unwrap();
 
         assert_eq!(test.operator, infix_expr.operator.literal);
         let left_expr = &*infix_expr.left_expr.borrow();
-        let left_value = unwrap_variant!(left_expr, Expression::Int);
+        let left_value = cast_variant!(left_expr, Expression::Int).unwrap();
 
         assert_eq!(test.left_value, left_value.value);
 
         let right_expr = &*infix_expr.right_expr.borrow();
-        let right_value = unwrap_variant!(right_expr, Expression::Int);
+        let right_value = cast_variant!(right_expr, Expression::Int).unwrap();
 
         assert_eq!(test.right_value, right_value.value);
 
@@ -392,12 +420,61 @@ fn test_operator_precedence_parsing() {
     }
 }
 
-fn test_identifier(expr: Expression, value: String) -> bool {
-    let ident = unwrap_variant!(expr, Expression::Ident);
+fn test_identifier(expr: &Expression, value: String) {
+    let ident = cast_variant!(expr, Expression::Ident).unwrap();
 
-    assert_eq!(value, ident.value);
+    check!(value != ident.value).unwrap();
+    check!(ident.token.literal != value).unwrap();
+}
 
-    assert_eq!(value, ident.token.literal);
+/*
+ * A few words regarding the mess ahead:
+ * In the book most of these functions return a bool, where I decided to return Results. I'm not
+ * sure sure what the reason is behind returning upon error instead of panicking, so I'm doing a
+ * weird combination of the two right now
+ *
+ * */
 
-    todo!()
+fn test_integer_literal(expr: &Expression, value: &i64) -> TResult<()> {
+    let integ = cast_variant!(expr, Expression::Int).or_else(print_error)?;
+
+    check!(integ.value == *value).or_else(print_error)?;
+
+    check!(integ.token.literal == value.to_string()).or_else(print_error)?;
+
+    Ok(())
+}
+
+fn test_string_literal(expr: &Expression, value: &str) -> TResult<()> {
+    let string = cast_variant!(expr, Expression::Ident).or_else(print_error)?;
+
+    check!(string.value == value).or_else(print_error)?;
+
+    check!(string.token.literal == value).or_else(print_error)?;
+
+    Ok(())
+}
+
+fn test_literal_expression(expr: &Expression, expected: &LiteralValue) -> TResult<()> {
+    match expected {
+        LiteralValue::Int(n) => test_integer_literal(expr, n),
+        LiteralValue::Str(s) => test_string_literal(expr, &s),
+    }
+}
+
+fn test_infix_expression(
+    expr: &Expression,
+    left: &LiteralValue,
+    operator: &str,
+    right: &LiteralValue,
+) -> TResult<()> {
+    let op_expr = cast_variant!(expr, Expression::InfixExpr).or_else(print_error)?;
+
+    test_literal_expression(&*op_expr.left_expr.borrow(), &left)?;
+
+    check!(operator == op_expr.operator.literal).or_else(print_error)?;
+
+    test_literal_expression(&*op_expr.right_expr.borrow(), &right)?;
+
+    Ok(())
 }
