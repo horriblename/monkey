@@ -19,6 +19,7 @@ pub enum Node {
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
+    Expr(ExpressionStatement),
 }
 
 pub enum Expression {
@@ -50,6 +51,10 @@ pub struct Identifier {
 pub struct ReturnStatement {
     pub token: Token,
     pub expr: ChildNode<Expression>,
+}
+
+pub struct ExpressionStatement {
+    expr: Expression,
 }
 
 pub mod representation {
