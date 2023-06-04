@@ -81,7 +81,7 @@ fn test_return_statements() {
     for stmt in program.statements {
         if let Statement::Return(return_statement) = &stmt {
             // TODO test return_statement.expr
-            assert_eq!(TokenType::Return, return_statement.token.token_type);
+            assert_eq!(TokenType::Return, return_statement.token.type_);
             assert_eq!("return", return_statement.token.literal);
         } else {
             panic!("expected return statemnt, got something else");
@@ -113,19 +113,19 @@ fn test_string_repr() {
     let program = Program {
         statements: vec![Statement::Let(LetStatement {
             token: Token {
-                token_type: TokenType::Let,
+                type_: TokenType::Let,
                 literal: "let".to_string(),
             },
             name: Some(Rc::new(RefCell::new(Identifier {
                 token: Token {
-                    token_type: TokenType::Ident,
+                    type_: TokenType::Ident,
                     literal: "myVar".to_string(),
                 },
                 value: "myVar".to_string(),
             }))),
             value: Rc::new(RefCell::new(Expression::Ident(Identifier {
                 token: Token {
-                    token_type: TokenType::Ident,
+                    type_: TokenType::Ident,
                     literal: "anotherVar".to_string(),
                 },
                 value: "anotherVar".to_string(),
@@ -390,4 +390,14 @@ fn test_operator_precedence_parsing() {
         let actual = program.string_repr();
         assert_eq!(test.expected, actual);
     }
+}
+
+fn test_identifier(expr: Expression, value: String) -> bool {
+    let ident = unwrap_variant!(expr, Expression::Ident);
+
+    assert_eq!(value, ident.value);
+
+    assert_eq!(value, ident.token.literal);
+
+    todo!()
 }

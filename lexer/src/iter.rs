@@ -8,7 +8,7 @@ impl Iterator for Lexer {
 
     fn next(&mut self) -> Option<Self::Item> {
         let tok = self.next_token();
-        if tok.token_type == TokenType::EOF {
+        if tok.type_ == TokenType::EOF {
             None
         } else {
             Some(tok)

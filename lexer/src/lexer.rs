@@ -30,7 +30,7 @@ impl Lexer {
 
     pub fn next_token(&mut self) -> Token {
         let new_token = |token_type, ch: char| Token {
-            token_type,
+            type_: token_type,
             literal: ch.to_string(),
         };
 
@@ -53,7 +53,7 @@ impl Lexer {
                 if let Some(b'=') = self.peek_char() {
                     self.read_char();
                     Token {
-                        token_type: TokenType::NotEqual,
+                        type_: TokenType::NotEqual,
                         literal: "!=".to_string(),
                     }
                 } else {
@@ -64,7 +64,7 @@ impl Lexer {
                 if let Some(b'=') = self.peek_char() {
                     self.read_char();
                     Token {
-                        token_type: TokenType::Equal,
+                        type_: TokenType::Equal,
                         literal: "==".to_string(),
                     }
                 } else {
@@ -73,23 +73,23 @@ impl Lexer {
             }
             Some(ch) if ch.is_ascii_digit() => {
                 return Token {
-                    token_type: TokenType::Int,
+                    type_: TokenType::Int,
                     literal: self.read_int(),
                 };
             }
             Some(ch) if ch.is_ascii_alphabetic() => {
                 let literal = self.read_identifier();
                 return Token {
-                    token_type: Self::lookup_ident(&literal),
+                    type_: Self::lookup_ident(&literal),
                     literal,
                 };
             }
             Some(_) => Token {
-                token_type: TokenType::Illegal,
+                type_: TokenType::Illegal,
                 literal: "".to_string(),
             },
             None => Token {
-                token_type: TokenType::EOF,
+                type_: TokenType::EOF,
                 literal: "".to_string(),
             },
         };
@@ -281,7 +281,7 @@ mod tests {
         for (i, test) in tests.iter().enumerate() {
             let tok = lexer.next_token();
             println!("test #{}: got token: {}", i, tok.literal);
-            assert_eq!(test.tok_type, tok.token_type);
+            assert_eq!(test.tok_type, tok.type_);
             assert_eq!(test.literal, tok.literal);
         }
     }

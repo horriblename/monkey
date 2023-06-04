@@ -61,11 +61,11 @@ impl Parser {
     }
 
     fn curr_token_is(&self, t: TokenType) -> bool {
-        self.curr_token.token_type == t
+        self.curr_token.type_ == t
     }
 
     fn peek_token_is(&self, t: TokenType) -> bool {
-        self.peek_token.token_type == t
+        self.peek_token.type_ == t
     }
 
     /// `expect_peek` checks if the currently peeked token is the same type as `t`.
@@ -80,17 +80,17 @@ impl Parser {
     }
 
     fn curr_precedence(&self) -> OperatorPrecedence {
-        Self::operator_precedence(&self.curr_token.token_type)
+        Self::operator_precedence(&self.curr_token.type_)
     }
 
     fn peek_precedence(&self) -> OperatorPrecedence {
-        Self::operator_precedence(&self.peek_token.token_type)
+        Self::operator_precedence(&self.peek_token.type_)
     }
 
     // NOTE: I find `expect_peek` somewhat unintuitive to use, so I opted for something like this
     // instead
     fn expect_next(&mut self, t: TokenType) -> Option<Token> {
-        if self.curr_token.token_type == t {
+        if self.curr_token.type_ == t {
             Some(self.next_token())
         } else {
             self.add_next_error(t);
@@ -103,7 +103,7 @@ impl Parser {
     fn add_next_error(&mut self, expected: TokenType) {
         let msg = format!(
             "expected next token to be {:?}, got {:?} instead",
-            expected, self.curr_token.token_type
+            expected, self.curr_token.type_
         );
         self.errors.push(ParseError(msg));
     }
@@ -116,7 +116,7 @@ impl Parser {
     pub fn parse_program(&mut self) -> ast::Program {
         let mut program = ast::Program { statements: vec![] };
 
-        while self.curr_token.token_type != TokenType::EOF {
+        while self.curr_token.type_ != TokenType::EOF {
             let statement = self.parse_statement();
             program.statements.push(statement);
         }
@@ -129,7 +129,7 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> ast::Statement {
-        match self.curr_token.token_type {
+        match self.curr_token.type_ {
             TokenType::Let => ast::Statement::Let(self.parse_let_statement()),
             TokenType::Return => ast::Statement::Return(self.parse_return_statement()),
             _ => ast::Statement::Expr(self.parse_expression_statement()),
@@ -138,7 +138,7 @@ impl Parser {
 
     fn parse_let_statement(&mut self) -> ast::LetStatement {
         let let_keyword = self.next_token();
-        assert_eq!(let_keyword.token_type, TokenType::Let);
+        assert_eq!(let_keyword.type_, TokenType::Let);
 
         let name_token = self.expect_next(TokenType::Ident).and_then(|tok| {
             let literal = tok.literal.clone();
@@ -170,7 +170,7 @@ impl Parser {
 
     fn parse_return_statement(&mut self) -> ast::ReturnStatement {
         let return_keyword = self.next_token();
-        assert_eq!(return_keyword.token_type, TokenType::Return);
+        assert_eq!(return_keyword.type_, TokenType::Return);
 
         // TODO: we're skipping the expressions until we encounter a semicolon
         while !self.curr_token_is(TokenType::Semicolon) {
@@ -202,6 +202,15 @@ impl Parser {
     }
 
     // unary operators always take precedence over other operators, so we check for that first.
+    //
+    /// Chapter 2.7 gives a nice explanation of how everything works together!
+    ///
+    /// # operator precedence
+    ///
+    /// The goal is to have expression operators with higher precedence to be deeper in the tree
+    /// than expressions with lower precedence operators. This is accomplished by the `precedence`
+    /// argument (again, chapter 2.7, towards the middle part gives a good explanation using
+    /// concepts like left/right binding power)
     fn parse_expression(&mut self, precedence: OperatorPrecedence) -> ast::Expression {
         if let Some(mut left_expr) = self.parse_possible_prefix() {
             while !self.curr_token_is(TokenType::Semicolon) && precedence < self.curr_precedence() {
@@ -213,7 +222,7 @@ impl Parser {
 
             return left_expr;
         } else {
-            self.add_no_prefix_parse_fn_error(self.curr_token.token_type.clone());
+            self.add_no_prefix_parse_fn_error(self.curr_token.type_.clone());
             ast::Expression::TempDummy
         }
     }
@@ -223,8 +232,9 @@ impl Parser {
     // Prefix operators are followed by any expression as an operand
     // This name is somewhat misleading imo, should probably rename to something like
     // parse_expression_with_optional_prefix
+    //
     fn parse_possible_prefix(&mut self) -> Option<ast::Expression> {
-        match self.curr_token.token_type {
+        match self.curr_token.type_ {
             TokenType::Bang | TokenType::Minus => {
                 Some(ast::Expression::PrefixExpr(self.parse_prefix_expression()))
             }
@@ -247,7 +257,7 @@ impl Parser {
         &mut self,
         left: ast::Expression,
     ) -> Either<ast::Expression, ast::InfixExpression> {
-        if Self::is_infix_operator(&self.curr_token.token_type) {
+        if Self::is_infix_operator(&self.curr_token.type_) {
             Either::Right(self.parse_infix_expression(left))
         } else {
             Either::Left(left)
@@ -256,8 +266,8 @@ impl Parser {
 
     fn parse_infix_expression(&mut self, left: ast::Expression) -> ast::InfixExpression {
         let operator = self.next_token();
-        assert!(Self::is_infix_operator(&operator.token_type));
-        let precedence = Self::operator_precedence(&operator.token_type);
+        assert!(Self::is_infix_operator(&operator.type_));
+        let precedence = Self::operator_precedence(&operator.type_);
         let right = self.parse_expression(precedence);
 
         ast::InfixExpression {
@@ -276,7 +286,7 @@ impl Parser {
 
     fn parse_int(&mut self) -> ast::IntegerLiteral {
         let token = self.next_token();
-        assert_eq!(token.token_type, TokenType::Int);
+        assert_eq!(token.type_, TokenType::Int);
         let value: i64 = token.literal.parse().expect(&format!(
             "token is type {:?} but could not parse content {} as integer",
             TokenType::Int,
