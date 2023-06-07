@@ -34,12 +34,19 @@ macro_rules! cast_variant {
     }};
 }
 
-macro_rules! check {
-    ($condition: expr) => {{
-        if $condition {
+macro_rules! check_eq {
+    ($left: expr, $right: expr) => {{
+        let (lres, rres) = ($left, $right);
+        if lres == rres {
             Ok(())
         } else {
-            Err(TError(format!("check failed: {}", stringify!($condition))))
+            Err(TError(format!(
+                "check failed: {} == {}\nleft: {:?}\nright: {:?}",
+                stringify!($left),
+                stringify!($right),
+                lres,
+                rres,
+            )))
         }
     }};
 }
@@ -130,7 +137,7 @@ fn test_let_statement(stmt: &LetStatement, name: &str) -> bool {
 fn check_parse_errors(parser: &Parser) {
     // TODO
     for i in &parser.errors {
-        println!("Praser error: {:?}", i);
+        println!("Parser error: {:?}", i);
     }
 
     assert!(parser.errors.is_empty());
@@ -153,13 +160,13 @@ fn test_string_repr() {
                 },
                 value: "myVar".to_string(),
             }))),
-            value: Rc::new(RefCell::new(Expression::Ident(Identifier {
+            value: Some(Rc::new(RefCell::new(Expression::Ident(Identifier {
                 token: Token {
                     type_: TokenType::Ident,
                     literal: "anotherVar".to_string(),
                 },
                 value: "anotherVar".to_string(),
-            }))),
+            })))),
         })],
     };
 
@@ -183,7 +190,8 @@ fn test_identifier_expression() {
     }
 
     if let Statement::Expr(expr) = &program.statements[0] {
-        if let Expression::Ident(ident) = &*expr.expr.borrow() {
+        let expr = expr.expr.as_ref().unwrap();
+        if let Expression::Ident(ident) = &*expr.borrow() {
             assert_eq!("foobar", ident.value);
             assert_eq!("foobar", ident.token.literal);
         } else {
@@ -211,7 +219,8 @@ fn test_int_expression() {
     }
 
     if let Statement::Expr(expr) = &program.statements[0] {
-        if let Expression::Int(integer) = &*expr.expr.borrow() {
+        let expr = expr.expr.as_ref().expect("expected Expression, got None");
+        if let Expression::Int(integer) = &*expr.borrow() {
             assert_eq!(5, integer.value);
             assert_eq!("5", integer.token.literal);
         } else {
@@ -252,13 +261,18 @@ fn test_parsing_prefix_expressions() {
         assert_eq!(program.statements.len(), 1);
 
         let stmt = &program.statements[0];
-        let expr = &*cast_variant!(stmt, Statement::Expr).unwrap().expr.borrow();
+        let expr = &*cast_variant!(stmt, Statement::Expr)
+            .unwrap()
+            .expr
+            .as_ref()
+            .unwrap()
+            .borrow();
 
         let prefix_expr = cast_variant!(expr, Expression::PrefixExpr).unwrap();
 
         assert_eq!(t.operator, prefix_expr.operator.literal);
 
-        let right_expr = &*prefix_expr.operand.borrow();
+        let right_expr = &*prefix_expr.operand.as_ref().unwrap().borrow();
         let rvalue = cast_variant!(right_expr, Expression::Int).unwrap();
 
         assert_eq!(t.integer_value, rvalue.value);
@@ -341,14 +355,14 @@ fn test_parsing_infix_expressions() {
 
         let stmt = &program.statements[0];
         let expr_stmt = cast_variant!(stmt, Statement::Expr).unwrap();
-        let expr = &*expr_stmt.expr.borrow();
+        let expr = &*expr_stmt.expr.as_ref().unwrap().borrow();
         let infix_expr = cast_variant!(expr, Expression::InfixExpr).unwrap();
 
         assert_eq!(test.operator, infix_expr.operator.literal);
         let left_expr = &*infix_expr.left_expr.borrow();
         test_literal_expression(left_expr, &test.left_value).unwrap();
 
-        let right_expr = &*infix_expr.right_expr.borrow();
+        let right_expr = &*infix_expr.right_expr.as_ref().unwrap().borrow();
         test_literal_expression(right_expr, &test.right_value).unwrap();
 
         println!("{}", program.string_repr());
@@ -449,6 +463,10 @@ fn test_operator_precedence_parsing() {
             input: "!(true == true)",
             expected: "(!(true == true))",
         },
+        // Test {
+        //     input: "if (x < y) { x }",
+        //     expected: "(if )"
+        // }
     ];
 
     for test in tests {
@@ -462,11 +480,15 @@ fn test_operator_precedence_parsing() {
     }
 }
 
-fn test_identifier(expr: &Expression, value: String) {
-    let ident = cast_variant!(expr, Expression::Ident).unwrap();
+fn test_identifier(expr: &Expression, value: &str) -> TResult<()> {
+    let ident = cast_variant!(expr, Expression::Ident).or_else(print_error)?;
 
-    check!(value != ident.value).unwrap();
-    check!(ident.token.literal != value).unwrap();
+    check_eq!(value, &ident.value).or_else(print_error)?;
+    check_eq!(&ident.token.literal, value)
+        .or_else(print_error)
+        .unwrap();
+
+    Ok(())
 }
 
 /*
@@ -480,9 +502,9 @@ fn test_identifier(expr: &Expression, value: String) {
 fn test_integer_literal(expr: &Expression, value: &i64) -> TResult<()> {
     let integ = cast_variant!(expr, Expression::Int).or_else(print_error)?;
 
-    check!(integ.value == *value).or_else(print_error)?;
+    check_eq!(integ.value, *value).or_else(print_error)?;
 
-    check!(integ.token.literal == value.to_string()).or_else(print_error)?;
+    check_eq!(&integ.token.literal, &value.to_string()).or_else(print_error)?;
 
     Ok(())
 }
@@ -490,9 +512,9 @@ fn test_integer_literal(expr: &Expression, value: &i64) -> TResult<()> {
 fn test_string_literal(expr: &Expression, value: &str) -> TResult<()> {
     let string = cast_variant!(expr, Expression::Ident).or_else(print_error)?;
 
-    check!(string.value == value).or_else(print_error)?;
+    check_eq!(&string.value, value).or_else(print_error)?;
 
-    check!(string.token.literal == value).or_else(print_error)?;
+    check_eq!(&string.token.literal, value).or_else(print_error)?;
 
     Ok(())
 }
@@ -500,9 +522,9 @@ fn test_string_literal(expr: &Expression, value: &str) -> TResult<()> {
 fn test_bool_literal(expr: &Expression, value: &bool) -> TResult<()> {
     let boolean = cast_variant!(expr, Expression::Bool).or_else(print_error)?;
 
-    check!(boolean.value == *value).or_else(print_error)?;
+    check_eq!(boolean.value, *value).or_else(print_error)?;
 
-    check!(boolean.token.literal == value.to_string()).or_else(print_error)?;
+    check_eq!(&boolean.token.literal, &value.to_string()).or_else(print_error)?;
 
     Ok(())
 }
@@ -525,9 +547,9 @@ fn test_infix_expression(
 
     test_literal_expression(&*op_expr.left_expr.borrow(), &left)?;
 
-    check!(operator == op_expr.operator.literal).or_else(print_error)?;
+    check_eq!(operator, &op_expr.operator.literal).or_else(print_error)?;
 
-    test_literal_expression(&*op_expr.right_expr.borrow(), &right)?;
+    test_literal_expression(&*op_expr.right_expr.as_ref().unwrap().borrow(), &right)?;
 
     Ok(())
 }
@@ -548,4 +570,88 @@ fn test_boolean_literal_expression() {
     let program = parser.parse_program();
     assert_eq!(4, program.statements.len());
     check_parse_errors(&parser);
+}
+
+#[test]
+fn test_if_expression() {
+    let input = "if (x < y) { x }";
+    let lexer = Lexer::new(input.to_string());
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    assert_eq!(1, program.statements.len());
+
+    let stmt = &cast_variant!(&program.statements[0], Statement::Expr).unwrap();
+
+    let stmt = stmt
+        .expr
+        .as_ref()
+        .expect("expected Expression, got None")
+        .borrow();
+    let expr = cast_variant!(&*stmt, Expression::IfExpr).unwrap();
+
+    test_infix_expression(
+        &expr.condition.as_ref().unwrap().borrow(),
+        &LiteralValue::Str("x".to_string()),
+        "<",
+        &LiteralValue::Str("y".to_string()),
+    )
+    .unwrap();
+
+    assert_eq!(1, expr.consequence.borrow().statements.len());
+
+    let expr = expr.consequence.borrow();
+    let consequence = &*expr.statements[0].borrow();
+    let consequence = cast_variant!(consequence, Statement::Expr).unwrap();
+
+    test_identifier(&consequence.expr.as_ref().unwrap().borrow(), "x").unwrap();
+}
+
+#[test]
+fn test_if_else_expression() {
+    let input = "if (x < y) { x } else { y }";
+    let lexer = Lexer::new(input.to_string());
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    assert_eq!(1, program.statements.len());
+
+    let stmt = &cast_variant!(&program.statements[0], Statement::Expr).unwrap();
+
+    let stmt = stmt
+        .expr
+        .as_ref()
+        .expect("expected Expression, got None")
+        .borrow();
+    let expr = cast_variant!(&*stmt, Expression::IfExpr).unwrap();
+
+    test_infix_expression(
+        &expr.condition.as_ref().unwrap().borrow(),
+        &LiteralValue::Str("x".to_string()),
+        "<",
+        &LiteralValue::Str("y".to_string()),
+    )
+    .unwrap();
+
+    assert_eq!(1, expr.consequence.borrow().statements.len());
+
+    let consequence = expr.consequence.borrow();
+    let consequence = &*consequence.statements[0].borrow();
+    let consequence = cast_variant!(consequence, Statement::Expr).unwrap();
+
+    test_identifier(&consequence.expr.as_ref().unwrap().borrow(), "x").unwrap();
+
+    let alt = expr
+        .alternative
+        .as_ref()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .borrow();
+    let alt = &*alt.statements[0].borrow();
+    let alt = cast_variant!(alt, Statement::Expr).unwrap();
+
+    test_identifier(&alt.expr.as_ref().unwrap().borrow(), "y").unwrap();
 }

@@ -117,8 +117,10 @@ impl Parser {
         let mut program = ast::Program { statements: vec![] };
 
         while self.curr_token.type_ != TokenType::EOF {
-            let statement = self.parse_statement();
-            program.statements.push(statement);
+            // might want to turn program.statements into Vec<Option<Statement>>>
+            if let Some(statement) = self.parse_statement() {
+                program.statements.push(statement);
+            }
         }
 
         program
@@ -128,11 +130,13 @@ impl Parser {
         &self.errors
     }
 
-    fn parse_statement(&mut self) -> ast::Statement {
+    fn parse_statement(&mut self) -> Option<ast::Statement> {
         match self.curr_token.type_ {
-            TokenType::Let => ast::Statement::Let(self.parse_let_statement()),
-            TokenType::Return => ast::Statement::Return(self.parse_return_statement()),
-            _ => ast::Statement::Expr(self.parse_expression_statement()),
+            TokenType::Let => Some(ast::Statement::Let(self.parse_let_statement())),
+            TokenType::Return => Some(ast::Statement::Return(self.parse_return_statement())),
+            _ => self
+                .parse_expression_statement()
+                .map(|expr| ast::Statement::Expr(expr)),
         }
     }
 
@@ -164,7 +168,7 @@ impl Parser {
         ast::LetStatement {
             token: let_keyword,
             name: name_token,
-            value: Rc::new(RefCell::new(ast::Expression::MissingExpression)),
+            value: None,
         }
     }
 
@@ -185,20 +189,26 @@ impl Parser {
 
         ast::ReturnStatement {
             token: return_keyword,
-            expr: Rc::new(RefCell::new(ast::Expression::MissingExpression)),
+            expr: None, // TODO
         }
     }
 
-    fn parse_expression_statement(&mut self) -> ast::ExpressionStatement {
-        let expr = Rc::new(RefCell::new(
-            self.parse_expression(OperatorPrecedence::Lowest),
-        ));
+    /// `;` is treated as an ExpressionStatement with `None` in the `expr` field.
+    /// This function only returns None if no expression or `;` was found.
+    fn parse_expression_statement(&mut self) -> Option<ast::ExpressionStatement> {
+        let expr = self
+            .parse_expression(OperatorPrecedence::Lowest)
+            .map(wrap_in_rc_refcell);
+
+        if expr.is_none() && !self.curr_token_is(TokenType::Semicolon) {
+            return None;
+        }
 
         if self.curr_token_is(TokenType::Semicolon) {
             self.next_token();
         }
 
-        ast::ExpressionStatement { expr }
+        Some(ast::ExpressionStatement { expr })
     }
 
     // unary operators always take precedence over other operators, so we check for that first.
@@ -211,19 +221,19 @@ impl Parser {
     /// than expressions with lower precedence operators. This is accomplished by the `precedence`
     /// argument (again, chapter 2.7, towards the middle part gives a good explanation using
     /// concepts like left/right binding power)
-    fn parse_expression(&mut self, precedence: OperatorPrecedence) -> ast::Expression {
+    fn parse_expression(&mut self, precedence: OperatorPrecedence) -> Option<ast::Expression> {
         if let Some(mut left_expr) = self.parse_possible_prefix() {
             while !self.curr_token_is(TokenType::Semicolon) && precedence < self.curr_precedence() {
                 left_expr = match self.parse_possible_infix_expression(left_expr) {
-                    Either::Left(expr) => return expr,
+                    Either::Left(expr) => return Some(expr),
                     Either::Right(infix) => ast::Expression::InfixExpr(infix),
                 };
             }
 
-            return left_expr;
+            return Some(left_expr);
         } else {
             self.add_no_prefix_parse_fn_error(self.curr_token.type_.clone());
-            Expression::MissingExpression
+            None
         }
     }
 
@@ -231,23 +241,26 @@ impl Parser {
     //
     // Prefix operators are followed by any expression as an operand
     // This name is somewhat misleading imo, should probably rename to something like
-    // parse_literal_with_optional_prefix
+    // parse_start_of_expression
     //
     fn parse_possible_prefix(&mut self) -> Option<ast::Expression> {
         match self.curr_token.type_ {
             TokenType::Bang | TokenType::Minus => {
                 Some(ast::Expression::PrefixExpr(self.parse_prefix_expression()))
             }
-            TokenType::LParen => Some(self.parse_grouped_expression()),
+            TokenType::LParen => self.parse_grouped_expression(),
             TokenType::Ident => Some(ast::Expression::Ident(self.parse_identifier())),
             TokenType::Int => Some(ast::Expression::Int(self.parse_int())),
             TokenType::True | TokenType::False => Some(ast::Expression::Bool(self.parse_bool())),
+            TokenType::If => self
+                .parse_if_expression()
+                .map(|expr| Expression::IfExpr(expr)),
             _ => None,
         }
     }
 
     // Parenthesised expressions `(5 + 5)`
-    fn parse_grouped_expression(&mut self) -> ast::Expression {
+    fn parse_grouped_expression(&mut self) -> Option<ast::Expression> {
         self.next_token();
         let expr = self.parse_expression(OperatorPrecedence::Lowest);
         self.expect_next(TokenType::RParen);
@@ -257,9 +270,9 @@ impl Parser {
 
     fn parse_prefix_expression(&mut self) -> ast::PrefixExpression {
         let operator = self.next_token();
-        let operand = Rc::new(RefCell::new(
-            self.parse_expression(OperatorPrecedence::Prefix),
-        ));
+        let operand = self
+            .parse_expression(OperatorPrecedence::Prefix)
+            .map(|expr| Rc::new(RefCell::new(expr)));
 
         ast::PrefixExpression { operator, operand }
     }
@@ -284,7 +297,7 @@ impl Parser {
         ast::InfixExpression {
             left_expr: Rc::new(RefCell::new(left)),
             operator,
-            right_expr: Rc::new(RefCell::new(right)),
+            right_expr: right.map(|right| Rc::new(RefCell::new(right))),
         }
     }
 
@@ -313,6 +326,71 @@ impl Parser {
         let value: bool = token.type_ == TokenType::True;
 
         ast::BooleanLiteral { token, value }
+    }
+
+    fn parse_if_expression(&mut self) -> Option<ast::IfExpression> {
+        let token = self.next_token();
+        assert_eq!(token.type_, TokenType::If);
+
+        if self.expect_next(TokenType::LParen).is_none() {
+            return None;
+        }
+
+        let condition = self
+            .parse_expression(OperatorPrecedence::Lowest)
+            .map(wrap_in_rc_refcell);
+
+        self.expect_next(TokenType::RParen)?;
+
+        self.expect_next(TokenType::LBrace)?;
+
+        let consequence = Rc::new(RefCell::new(self.parse_block_expression()));
+
+        let alternative = if self.curr_token_is(TokenType::Else) {
+            Some({
+                self.next_token();
+                self.expect_next(TokenType::LBrace)?;
+                Some(Rc::new(RefCell::new(self.parse_block_expression())))
+            })
+        } else {
+            None
+        };
+
+        Some(ast::IfExpression {
+            token,
+            condition,
+            consequence,
+            alternative,
+        })
+    }
+
+    fn parse_block_expression(&mut self) -> ast::BlockExpression {
+        let mut statements = vec![];
+
+        while !self.curr_token_is(TokenType::RBrace) {
+            if let Some(stmt) = self.parse_maybe_statement() {
+                statements.push(Rc::new(RefCell::new(stmt)));
+            } else {
+                break;
+            }
+        }
+
+        // probably should make this function Option<_> and propagate this
+        self.expect_next(TokenType::RBrace);
+
+        ast::BlockExpression { statements }
+    }
+
+    // might be a good idea to merge with `parse_statement`?
+    /// returns a statement or None if no statement can be parsed
+    fn parse_maybe_statement(&mut self) -> Option<ast::Statement> {
+        match self.curr_token.type_ {
+            TokenType::Let => Some(ast::Statement::Let(self.parse_let_statement())),
+            TokenType::Return => Some(ast::Statement::Return(self.parse_return_statement())),
+            _ => self
+                .parse_expression_statement()
+                .map(|expr| ast::Statement::Expr(expr)),
+        }
     }
 
     fn operator_precedence(token_type: &TokenType) -> OperatorPrecedence {
@@ -349,6 +427,10 @@ enum OperatorPrecedence {
     Product = 4,     // *
     Prefix = 5,      // -X or !X
     Call = 6,        // myFunction(X)
+}
+
+fn wrap_in_rc_refcell<T>(val: T) -> Rc<RefCell<T>> {
+    Rc::new(RefCell::new(val))
 }
 
 #[cfg(test)]

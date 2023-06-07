@@ -9,6 +9,7 @@ use lexer::token::Token;
 use std::{cell::RefCell, rc::Rc};
 
 type ChildNode<T> = Rc<RefCell<T>>;
+type ExpectedChild<T> = Option<Rc<RefCell<T>>>;
 
 #[derive(Debug)]
 pub enum Node {
@@ -22,6 +23,7 @@ pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
     Expr(ExpressionStatement),
+    Block(BlockExpression),
 }
 
 #[derive(Debug)]
@@ -31,7 +33,7 @@ pub enum Expression {
     Bool(BooleanLiteral),
     PrefixExpr(PrefixExpression),
     InfixExpr(InfixExpression),
-    MissingExpression,
+    IfExpr(IfExpression),
 }
 
 #[derive(Debug)]
@@ -46,10 +48,10 @@ pub struct LetStatement {
     /// left haand side
     // NOTE: this is Option<_> to make it possible to parse erroneous input without panicing
     // might make it something else in the future
-    pub name: Option<ChildNode<Identifier>>,
+    pub name: ExpectedChild<Identifier>,
 
     /// right hand side
-    pub value: ChildNode<Expression>,
+    pub value: ExpectedChild<Expression>,
 }
 
 #[derive(Debug)]
@@ -73,32 +75,50 @@ pub struct BooleanLiteral {
 #[derive(Debug)]
 pub struct ReturnStatement {
     pub token: Token,
-    pub expr: ChildNode<Expression>,
+    pub expr: ExpectedChild<Expression>,
 }
 
 #[derive(Debug)]
 pub struct ExpressionStatement {
-    pub expr: ChildNode<Expression>,
+    pub expr: ExpectedChild<Expression>,
+}
+
+// { statement; ... }
+#[derive(Debug)]
+pub struct BlockExpression {
+    pub statements: Vec<ChildNode<Statement>>,
 }
 
 #[derive(Debug)]
 pub struct PrefixExpression {
     pub operator: Token,
-    pub operand: ChildNode<Expression>,
+    pub operand: ExpectedChild<Expression>,
 }
 
 #[derive(Debug)]
 pub struct InfixExpression {
     pub left_expr: ChildNode<Expression>,
     pub operator: Token,
-    pub right_expr: ChildNode<Expression>,
+    pub right_expr: ExpectedChild<Expression>,
+}
+
+#[derive(Debug)]
+pub struct IfExpression {
+    pub token: Token,
+    pub condition: ExpectedChild<Expression>,
+    pub consequence: ChildNode<BlockExpression>,
+    /// The first Option indicates whether a follow-up else clause was given.
+    ///
+    /// The second Option shows if there is an error while parsing the else block.
+    pub alternative: Option<ExpectedChild<BlockExpression>>,
 }
 
 pub mod representation {
 
     use super::{
-        BooleanLiteral, Expression, ExpressionStatement, Identifier, InfixExpression,
-        IntegerLiteral, LetStatement, Node, PrefixExpression, Program, ReturnStatement, Statement,
+        BlockExpression, BooleanLiteral, Expression, ExpressionStatement, Identifier, IfExpression,
+        InfixExpression, IntegerLiteral, LetStatement, Node, PrefixExpression, Program,
+        ReturnStatement, Statement,
     };
 
     pub trait StringRepr {
@@ -130,6 +150,7 @@ pub mod representation {
                 Self::Let(stmt) => stmt.string_repr(),
                 Self::Return(stmt) => stmt.string_repr(),
                 Self::Expr(stmt) => stmt.string_repr(),
+                Self::Block(block) => block.string_repr(),
             }
         }
     }
@@ -142,7 +163,7 @@ pub mod representation {
                 Self::Bool(b) => b.string_repr(),
                 Self::PrefixExpr(expr) => expr.string_repr(),
                 Self::InfixExpr(expr) => expr.string_repr(),
-                Self::MissingExpression => "<MissingExpression>".to_string(),
+                Self::IfExpr(expr) => expr.string_repr(),
             }
         }
     }
@@ -156,7 +177,7 @@ pub mod representation {
                     .as_ref()
                     .and_then(|name| Some(name.as_ref().borrow().string_repr()))
                     .unwrap_or_else(|| "<None>".to_string()),
-                self.value.as_ref().borrow().string_repr()
+                self.value.as_ref().unwrap().borrow().string_repr()
             )
         }
     }
@@ -169,7 +190,17 @@ pub mod representation {
 
     impl StringRepr for ExpressionStatement {
         fn string_repr(&self) -> String {
-            self.expr.as_ref().borrow().string_repr()
+            self.expr.as_ref().unwrap().borrow().string_repr()
+        }
+    }
+
+    impl StringRepr for BlockExpression {
+        fn string_repr(&self) -> String {
+            self.statements
+                .iter()
+                .map(|stmt| stmt.borrow().string_repr())
+                .collect::<Vec<_>>()
+                .join("")
         }
     }
 
@@ -196,7 +227,7 @@ pub mod representation {
             format!(
                 "({}{})",
                 self.operator.literal,
-                self.operand.borrow().string_repr()
+                self.operand.as_ref().unwrap().borrow().string_repr()
             )
         }
     }
@@ -207,8 +238,24 @@ pub mod representation {
                 "({} {} {})",
                 self.left_expr.borrow().string_repr(),
                 self.operator.literal,
-                self.right_expr.borrow().string_repr(),
+                self.right_expr.as_ref().unwrap().borrow().string_repr(),
             )
+        }
+    }
+
+    impl StringRepr for IfExpression {
+        fn string_repr(&self) -> String {
+            let mut repr = self.token.literal.to_string();
+            repr.push_str(&self.condition.as_ref().unwrap().borrow().string_repr());
+            repr.push(' ');
+            repr.push_str(&self.consequence.borrow().string_repr());
+
+            if let Some(block) = &self.alternative {
+                repr.push_str(" else ");
+                repr.push_str(&block.as_ref().unwrap().borrow().string_repr());
+            }
+
+            repr
         }
     }
 }
