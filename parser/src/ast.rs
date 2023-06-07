@@ -1,19 +1,19 @@
-//! # BNF
+//! # BNF (outdated)
 //!
 //! Program ::= Statement | Statement Program
 //! Statement ::= let Identifier = Expression ";"
 //! Expression ::= [undefined]
-#![allow(dead_code)]
 
 use lexer::token::Token;
 use std::{cell::RefCell, rc::Rc};
 
 type ChildNode<T> = Rc<RefCell<T>>;
+// TODO: I could possibly turn ExpectedChild into a Result<Rc<RefCell<T>>, ParserError>
+// This give would meaning to the otherwise elusive Option<_>
 type ExpectedChild<T> = Option<Rc<RefCell<T>>>;
 
 #[derive(Debug)]
 pub enum Node {
-    // TODO maybe not put Program as a variant, since it's only used "once"
     Stmt(Statement),
     Expr(Expression),
 }
