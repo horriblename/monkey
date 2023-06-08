@@ -7,7 +7,7 @@
 // Using strings is not as performant as int or byte though
 
 // NOTE: probably would be nicer to rewrite Token as an enum
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub type_: TokenType,
     pub literal: String,

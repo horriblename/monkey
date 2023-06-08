@@ -655,3 +655,78 @@ fn test_if_else_expression() {
 
     test_identifier(&alt.expr.as_ref().unwrap().borrow(), "y").unwrap();
 }
+
+#[test]
+fn test_function_literal_parsing() {
+    let input = "fn(x, y) { x + y; }";
+    let lexer = Lexer::new(input.to_string());
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    assert_eq!(1, program.statements.len());
+    let expr = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
+    let expr = &*expr.expr.as_ref().unwrap().borrow();
+    let func = cast_variant!(expr, Expression::Fn).unwrap();
+
+    let params = func.parameters.as_ref().unwrap();
+    assert_eq!(2, params.len());
+
+    let param_1 = params[0].borrow().clone();
+    // let param_1 = binding.borrow();
+    test_literal_expression(
+        &Expression::Ident(param_1),
+        &LiteralValue::Str("x".to_string()),
+    )
+    .unwrap();
+
+    let param_2 = params[1].borrow().clone();
+    test_literal_expression(
+        &Expression::Ident(param_2),
+        &LiteralValue::Str("y".to_string()),
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_function_parameter_parsing() {
+    struct Test {
+        input: &'static str,
+        expected_params: Vec<&'static str>,
+    }
+
+    let tests = vec![
+        Test {
+            input: "fn() {};",
+            expected_params: vec![],
+        },
+        Test {
+            input: "fn(x) {};",
+            expected_params: vec!["x"],
+        },
+        Test {
+            input: "fn(x, y, z) {};",
+            expected_params: vec!["x", "y", "z"],
+        },
+    ];
+
+    for test in tests {
+        let lexer = Lexer::new(test.input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parse_errors(&parser);
+
+        let stmt = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
+        let stmt = stmt.expr.as_ref().unwrap().borrow();
+        let func = cast_variant!(&*stmt, Expression::Fn).unwrap();
+
+        let params = func.parameters.as_ref().unwrap();
+        assert_eq!(test.expected_params.len(), params.len());
+
+        for (expected, got) in test.expected_params.iter().zip(params) {
+            let ident = got.borrow().clone();
+            let expected = LiteralValue::Str(expected.to_string());
+            test_literal_expression(&Expression::Ident(ident), &expected).unwrap();
+        }
+    }
+}

@@ -23,7 +23,7 @@ pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
     Expr(ExpressionStatement),
-    Block(BlockExpression),
+    Block(BlockStatement),
 }
 
 #[derive(Debug)]
@@ -34,6 +34,7 @@ pub enum Expression {
     PrefixExpr(PrefixExpression),
     InfixExpr(InfixExpression),
     IfExpr(IfExpression),
+    Fn(FunctionLiteral),
 }
 
 #[derive(Debug)]
@@ -54,7 +55,7 @@ pub struct LetStatement {
     pub value: ExpectedChild<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Identifier {
     pub token: Token,
     pub value: String, // isn't this the same as `Token.literal`??
@@ -85,7 +86,7 @@ pub struct ExpressionStatement {
 
 // { statement; ... }
 #[derive(Debug)]
-pub struct BlockExpression {
+pub struct BlockStatement {
     pub statements: Vec<ChildNode<Statement>>,
 }
 
@@ -106,19 +107,26 @@ pub struct InfixExpression {
 pub struct IfExpression {
     pub token: Token,
     pub condition: ExpectedChild<Expression>,
-    pub consequence: ChildNode<BlockExpression>,
+    pub consequence: ChildNode<BlockStatement>,
     /// The first Option indicates whether a follow-up else clause was given.
     ///
     /// The second Option shows if there is an error while parsing the else block.
-    pub alternative: Option<ExpectedChild<BlockExpression>>,
+    pub alternative: Option<ExpectedChild<BlockStatement>>,
+}
+
+#[derive(Debug)]
+pub struct FunctionLiteral {
+    pub token: Token,
+    pub parameters: Option<Vec<ChildNode<Identifier>>>,
+    pub body: ChildNode<BlockStatement>,
 }
 
 pub mod representation {
 
     use super::{
-        BlockExpression, BooleanLiteral, Expression, ExpressionStatement, Identifier, IfExpression,
-        InfixExpression, IntegerLiteral, LetStatement, Node, PrefixExpression, Program,
-        ReturnStatement, Statement,
+        BlockStatement, BooleanLiteral, Expression, ExpressionStatement, FunctionLiteral,
+        Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement, Node,
+        PrefixExpression, Program, ReturnStatement, Statement,
     };
 
     pub trait StringRepr {
@@ -164,6 +172,7 @@ pub mod representation {
                 Self::PrefixExpr(expr) => expr.string_repr(),
                 Self::InfixExpr(expr) => expr.string_repr(),
                 Self::IfExpr(expr) => expr.string_repr(),
+                Self::Fn(func) => func.string_repr(),
             }
         }
     }
@@ -194,7 +203,7 @@ pub mod representation {
         }
     }
 
-    impl StringRepr for BlockExpression {
+    impl StringRepr for BlockStatement {
         fn string_repr(&self) -> String {
             self.statements
                 .iter()
@@ -256,6 +265,23 @@ pub mod representation {
             }
 
             repr
+        }
+    }
+
+    impl StringRepr for FunctionLiteral {
+        fn string_repr(&self) -> String {
+            let params = self.parameters.as_ref().map(|params| {
+                params
+                    .iter()
+                    .map(|param| param.borrow().string_repr())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            });
+            format!(
+                "fn({}){}",
+                params.unwrap_or_else(|| "[parsing error in parameters]".to_string()),
+                self.body.borrow().string_repr()
+            )
         }
     }
 }

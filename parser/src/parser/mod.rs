@@ -200,6 +200,7 @@ impl Parser {
             .parse_expression(OperatorPrecedence::Lowest)
             .map(wrap_in_rc_refcell);
 
+        // NOTE: this is not in the book and I can't remember why I added it :P
         if expr.is_none() && !self.curr_token_is(TokenType::Semicolon) {
             return None;
         }
@@ -242,7 +243,6 @@ impl Parser {
     // Prefix operators are followed by any expression as an operand
     // This name is somewhat misleading imo, should probably rename to something like
     // parse_start_of_expression
-    //
     fn parse_possible_prefix(&mut self) -> Option<ast::Expression> {
         match self.curr_token.type_ {
             TokenType::Bang | TokenType::Minus => {
@@ -255,6 +255,9 @@ impl Parser {
             TokenType::If => self
                 .parse_if_expression()
                 .map(|expr| Expression::IfExpr(expr)),
+            TokenType::Function => self
+                .parse_fn_literal()
+                .map(|func| ast::Expression::Fn(func)),
             _ => None,
         }
     }
@@ -364,7 +367,57 @@ impl Parser {
         })
     }
 
-    fn parse_block_expression(&mut self) -> ast::BlockExpression {
+    fn parse_fn_literal(&mut self) -> Option<ast::FunctionLiteral> {
+        let token = self.next_token();
+
+        self.expect_next(TokenType::LParen)?;
+
+        let parameters = self.parse_function_parameters();
+
+        self.expect_next(TokenType::LBrace)?;
+
+        let body = self.parse_block_expression();
+
+        Some(ast::FunctionLiteral {
+            token,
+            parameters,
+            body: Rc::new(RefCell::new(body)),
+        })
+    }
+
+    fn parse_function_parameters(&mut self) -> Option<Vec<Rc<RefCell<ast::Identifier>>>> {
+        let mut params = Vec::new();
+
+        if self.curr_token_is(TokenType::RParen) {
+            self.next_token();
+            return Some(params);
+        }
+
+        let param = self.next_token();
+        let ident = ast::Identifier {
+            value: param.literal.clone(),
+            token: param,
+        };
+        params.push(Rc::new(RefCell::new(ident)));
+
+        while self.curr_token_is(TokenType::Comma) {
+            self.next_token();
+
+            if let Some(param) = self.expect_next(TokenType::Ident) {
+                let ident = ast::Identifier {
+                    value: param.literal.clone(),
+                    token: param,
+                };
+                params.push(Rc::new(RefCell::new(ident)));
+            }
+        }
+
+        self.expect_next(TokenType::RParen)?;
+
+        Some(params)
+    }
+
+    fn parse_block_expression(&mut self) -> ast::BlockStatement {
         let mut statements = vec![];
 
         while !self.curr_token_is(TokenType::RBrace) {
@@ -378,7 +431,7 @@ impl Parser {
         // probably should make this function Option<_> and propagate this
         self.expect_next(TokenType::RBrace);
 
-        ast::BlockExpression { statements }
+        ast::BlockStatement { statements }
     }
 
     // might be a good idea to merge with `parse_statement`?
