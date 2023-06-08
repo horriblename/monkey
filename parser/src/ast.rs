@@ -35,6 +35,7 @@ pub enum Expression {
     InfixExpr(InfixExpression),
     IfExpr(IfExpression),
     Fn(FunctionLiteral),
+    Call(CallExpression),
 }
 
 #[derive(Debug)]
@@ -121,12 +122,19 @@ pub struct FunctionLiteral {
     pub body: ChildNode<BlockStatement>,
 }
 
+#[derive(Debug)]
+pub struct CallExpression {
+    pub token: Token, // '('
+    pub function: ChildNode<Expression>,
+    pub arguments: Vec<ExpectedChild<Expression>>,
+}
+
 pub mod representation {
 
     use super::{
-        BlockStatement, BooleanLiteral, Expression, ExpressionStatement, FunctionLiteral,
-        Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement, Node,
-        PrefixExpression, Program, ReturnStatement, Statement,
+        BlockStatement, BooleanLiteral, CallExpression, Expression, ExpressionStatement,
+        FunctionLiteral, Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement,
+        Node, PrefixExpression, Program, ReturnStatement, Statement,
     };
 
     pub trait StringRepr {
@@ -173,6 +181,7 @@ pub mod representation {
                 Self::InfixExpr(expr) => expr.string_repr(),
                 Self::IfExpr(expr) => expr.string_repr(),
                 Self::Fn(func) => func.string_repr(),
+                Self::Call(call) => call.string_repr(),
             }
         }
     }
@@ -282,6 +291,23 @@ pub mod representation {
                 params.unwrap_or_else(|| "[parsing error in parameters]".to_string()),
                 self.body.borrow().string_repr()
             )
+        }
+    }
+
+    impl StringRepr for CallExpression {
+        fn string_repr(&self) -> String {
+            let args = self
+                .arguments
+                .iter()
+                .map(|maybe_arg| {
+                    maybe_arg
+                        .as_ref()
+                        .map(|arg| arg.borrow().string_repr())
+                        .unwrap_or_else(|| "[parsing error in argument]".to_string())
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{}({})", self.function.borrow().string_repr(), args)
         }
     }
 }

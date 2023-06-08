@@ -463,6 +463,18 @@ fn test_operator_precedence_parsing() {
             input: "!(true == true)",
             expected: "(!(true == true))",
         },
+        Test {
+            input: "a + add(b * c) + d",
+            expected: "((a + add((b * c))) + d)",
+        },
+        Test {
+            input: "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+            expected: "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+        },
+        Test {
+            input: "add(a + b + c * d / f + g)",
+            expected: "add((((a + b) + ((c * d) / f)) + g))",
+        },
         // Test {
         //     input: "if (x < y) { x }",
         //     expected: "(if )"
@@ -729,4 +741,42 @@ fn test_function_parameter_parsing() {
             test_literal_expression(&Expression::Ident(ident), &expected).unwrap();
         }
     }
+}
+
+#[test]
+fn test_call_expression_parsing() {
+    let input = "add(1, 2 * 3, 4 + 5);";
+    let lexer = Lexer::new(input.to_string());
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    assert_eq!(1, program.statements.len());
+
+    let stmt = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
+
+    let stmt = &*stmt.expr.as_ref().unwrap().borrow();
+    let expr = cast_variant!(stmt, Expression::Call).unwrap();
+
+    test_literal_expression(
+        &expr.arguments[0].as_ref().unwrap().borrow(),
+        &LiteralValue::Int(1),
+    )
+    .unwrap();
+
+    test_infix_expression(
+        &expr.arguments[1].as_ref().unwrap().borrow(),
+        &LiteralValue::Int(2),
+        "*",
+        &LiteralValue::Int(3),
+    )
+    .unwrap();
+
+    test_infix_expression(
+        &expr.arguments[2].as_ref().unwrap().borrow(),
+        &LiteralValue::Int(4),
+        "+",
+        &LiteralValue::Int(5),
+    )
+    .unwrap();
 }

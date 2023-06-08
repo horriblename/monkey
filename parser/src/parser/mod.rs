@@ -33,6 +33,12 @@ enum Either<L, R> {
     Right(R),
 }
 
+enum InfixType {
+    Op(ast::InfixExpression),
+    Call(ast::CallExpression),
+    NotInfix(ast::Expression),
+}
+
 impl Parser {
     pub fn new(mut lexer: Lexer) -> Self {
         let curr_token = lexer.next_token();
@@ -120,6 +126,15 @@ impl Parser {
             // might want to turn program.statements into Vec<Option<Statement>>>
             if let Some(statement) = self.parse_statement() {
                 program.statements.push(statement);
+            } else {
+                // NOTE: this part is not in the book; for some reason I need this to stop infinite
+                // loops
+                // FIXME: should turn program.statements into Vec<Option<_>> and push None here
+                if self.curr_token_is(TokenType::Semicolon) {
+                    self.next_token();
+                } else {
+                    todo!("unrecoverable parsing error");
+                }
             }
         }
 
@@ -226,8 +241,9 @@ impl Parser {
         if let Some(mut left_expr) = self.parse_possible_prefix() {
             while !self.curr_token_is(TokenType::Semicolon) && precedence < self.curr_precedence() {
                 left_expr = match self.parse_possible_infix_expression(left_expr) {
-                    Either::Left(expr) => return Some(expr),
-                    Either::Right(infix) => ast::Expression::InfixExpr(infix),
+                    InfixType::NotInfix(expr) => return Some(expr),
+                    InfixType::Call(expr) => ast::Expression::Call(expr),
+                    InfixType::Op(infix) => ast::Expression::InfixExpr(infix),
                 };
             }
 
@@ -280,14 +296,20 @@ impl Parser {
         ast::PrefixExpression { operator, operand }
     }
 
-    fn parse_possible_infix_expression(
-        &mut self,
-        left: ast::Expression,
-    ) -> Either<ast::Expression, ast::InfixExpression> {
-        if Self::is_infix_operator(&self.curr_token.type_) {
-            Either::Right(self.parse_infix_expression(left))
-        } else {
-            Either::Left(left)
+    // replaces `Parser.prefixParseFns` in the book
+    //
+    fn parse_possible_infix_expression(&mut self, left: ast::Expression) -> InfixType {
+        match &self.curr_token.type_ {
+            TokenType::Equal
+            | TokenType::NotEqual
+            | TokenType::LessThan
+            | TokenType::GreaterThan
+            | TokenType::Plus
+            | TokenType::Minus
+            | TokenType::Slash
+            | TokenType::Asterisk => InfixType::Op(self.parse_infix_expression(left)),
+            TokenType::LParen => InfixType::Call(self.parse_call_expression(left)),
+            _ => InfixType::NotInfix(left),
         }
     }
 
@@ -302,6 +324,44 @@ impl Parser {
             operator,
             right_expr: right.map(|right| Rc::new(RefCell::new(right))),
         }
+    }
+
+    fn parse_call_expression(&mut self, left: ast::Expression) -> ast::CallExpression {
+        let token = self.next_token();
+        assert_eq!(token.type_, TokenType::LParen);
+
+        let args = self
+            .parse_call_arguments()
+            .into_iter()
+            .map(|arg| arg.map(wrap_in_rc_refcell))
+            .collect();
+
+        ast::CallExpression {
+            token,
+            function: Rc::new(RefCell::new(left)),
+            arguments: args,
+        }
+    }
+
+    fn parse_call_arguments(&mut self) -> Vec<Option<ast::Expression>> {
+        let mut args = vec![];
+
+        if self.curr_token_is(TokenType::RParen) {
+            self.next_token();
+            return args;
+        }
+
+        args.push(self.parse_expression(OperatorPrecedence::Lowest));
+
+        while self.curr_token_is(TokenType::Comma) {
+            self.next_token();
+            // let arg = self.next_token();
+            args.push(self.parse_expression(OperatorPrecedence::Lowest));
+        }
+
+        self.expect_next(TokenType::RParen);
+
+        args
     }
 
     fn parse_identifier(&mut self) -> ast::Identifier {
@@ -448,6 +508,7 @@ impl Parser {
 
     fn operator_precedence(token_type: &TokenType) -> OperatorPrecedence {
         match token_type {
+            TokenType::LParen => OperatorPrecedence::Call,
             TokenType::Equal | TokenType::NotEqual => OperatorPrecedence::Equals,
             TokenType::LessThan | TokenType::GreaterThan => OperatorPrecedence::LessGreater,
             TokenType::Plus | TokenType::Minus => OperatorPrecedence::Sum,
