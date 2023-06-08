@@ -159,7 +159,7 @@ impl Parser {
         let let_keyword = self.next_token();
         assert_eq!(let_keyword.type_, TokenType::Let);
 
-        let name_token = self.expect_next(TokenType::Ident).and_then(|tok| {
+        let name = self.expect_next(TokenType::Ident).and_then(|tok| {
             let literal = tok.literal.clone();
             Some(Rc::new(RefCell::new(ast::Identifier {
                 token: tok,
@@ -169,21 +169,16 @@ impl Parser {
 
         self.expect_next(TokenType::Assign);
 
-        // TODO: we're skipping the expressions until we encounter a semicolon
-        while !self.curr_token_is(TokenType::Semicolon) {
-            if self.curr_token_is(TokenType::EOF) {
-                let msg = format!("expected token or semicolon, got {:?}", TokenType::EOF);
-                self.errors.push(ParseError(msg));
-                break;
-            }
-            self.next_token();
-        }
-        self.next_token();
+        let value = self
+            .parse_expression(OperatorPrecedence::Lowest)
+            .map(wrap_in_rc_refcell);
+
+        self.expect_next(TokenType::Semicolon);
 
         ast::LetStatement {
             token: let_keyword,
-            name: name_token,
-            value: None,
+            name,
+            value,
         }
     }
 
@@ -191,20 +186,15 @@ impl Parser {
         let return_keyword = self.next_token();
         assert_eq!(return_keyword.type_, TokenType::Return);
 
-        // TODO: we're skipping the expressions until we encounter a semicolon
-        while !self.curr_token_is(TokenType::Semicolon) {
-            if self.curr_token_is(TokenType::EOF) {
-                let msg = format!("expected token or semicolon, got {:?}", TokenType::EOF);
-                self.errors.push(ParseError(msg));
-                break;
-            }
-            self.next_token();
-        }
-        self.next_token();
+        let expr = self
+            .parse_expression(OperatorPrecedence::Lowest)
+            .map(wrap_in_rc_refcell);
+
+        self.expect_next(TokenType::Semicolon);
 
         ast::ReturnStatement {
             token: return_keyword,
-            expr: None, // TODO
+            expr, // TODO
         }
     }
 

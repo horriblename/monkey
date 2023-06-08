@@ -58,71 +58,83 @@ fn print_error<T>(err: TError) -> TResult<T> {
 
 #[test]
 fn test_let_statements() {
-    let input = "
-        let x = 5;
-        let y = 10;
-        let foobar = 838383;
-    "
-    .to_string();
-
-    let lexer = Lexer::new(input);
-    let mut parser = Parser::new(lexer);
-
-    let program = parser.parse_program();
-    assert_eq!(3, program.statements.len());
-    check_parse_errors(&parser);
-
     struct Test {
+        input: &'static str,
         expected_identifier: &'static str,
+        expected_value: LiteralValue,
     }
     let tests = vec![
         Test {
+            input: "let x = 5;",
             expected_identifier: "x",
+            expected_value: LiteralValue::Int(4),
         },
         Test {
+            input: "let y = true;",
             expected_identifier: "y",
+            expected_value: LiteralValue::Bool(true),
         },
         Test {
+            input: "let foobar = y;",
             expected_identifier: "foobar",
+            expected_value: LiteralValue::Str("y".to_string()),
         },
     ];
 
-    for (test, stmt) in tests.iter().zip(program.statements) {
-        if let Statement::Let(let_statement) = &stmt {
-            assert_eq!(
-                test.expected_identifier,
-                let_statement.name.as_ref().unwrap().borrow().value
-            );
-            assert!(test_let_statement(let_statement, test.expected_identifier))
-        } else {
-            panic!("expected let statement, got something else");
-        }
+    for test in tests {
+        let lexer = Lexer::new(test.input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        check_parse_errors(&parser);
+
+        assert_eq!(1, program.statements.len());
+
+        let let_stmt = &program.statements[0];
+        let let_stmt = cast_variant!(&let_stmt, Statement::Let).unwrap();
+        assert_eq!(
+            test.expected_identifier,
+            let_stmt.name.as_ref().unwrap().borrow().value
+        );
+        assert!(test_let_statement(let_stmt, test.expected_identifier));
     }
 }
 
 #[test]
 fn test_return_statements() {
-    let input = "
-        return 5;
-        return 10;
-        return 993322;
-        "
-    .to_string();
+    struct Test {
+        input: &'static str,
+        expected_value: LiteralValue,
+    }
 
-    let lexer = Lexer::new(input);
-    let mut parser = Parser::new(lexer);
+    let tests = vec![
+        Test {
+            input: "return 50;",
+            expected_value: LiteralValue::Int(50),
+        },
+        Test {
+            input: "return y;",
+            expected_value: LiteralValue::Str("y".to_string()),
+        },
+    ];
 
-    let program = parser.parse_program();
-    check_parse_errors(&parser);
+    for test in tests {
+        let lexer = Lexer::new(test.input.to_string());
+        let mut parser = Parser::new(lexer);
 
-    for stmt in program.statements {
-        if let Statement::Return(return_statement) = &stmt {
-            // TODO test return_statement.expr
-            assert_eq!(TokenType::Return, return_statement.token.type_);
-            assert_eq!("return", return_statement.token.literal);
-        } else {
-            panic!("expected return statemnt, got something else");
-        }
+        let program = parser.parse_program();
+        check_parse_errors(&parser);
+
+        assert_eq!(1, program.statements.len());
+
+        let return_stmt = &program.statements[0];
+        let return_stmt = cast_variant!(return_stmt, Statement::Return).unwrap();
+
+        assert_eq!(TokenType::Return, return_stmt.token.type_);
+        assert_eq!("return", return_stmt.token.literal);
+
+        let return_expr = &*return_stmt.expr.as_ref().unwrap().borrow();
+        test_literal_expression(return_expr, &test.expected_value).unwrap();
     }
 }
 
