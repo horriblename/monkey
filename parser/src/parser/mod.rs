@@ -173,7 +173,9 @@ impl Parser {
             .parse_expression(OperatorPrecedence::Lowest)
             .map(wrap_in_rc_refcell);
 
-        self.expect_next(TokenType::Semicolon);
+        if self.curr_token_is(TokenType::Semicolon) {
+            self.next_token();
+        }
 
         ast::LetStatement {
             token: let_keyword,
@@ -190,7 +192,9 @@ impl Parser {
             .parse_expression(OperatorPrecedence::Lowest)
             .map(wrap_in_rc_refcell);
 
-        self.expect_next(TokenType::Semicolon);
+        if self.curr_token_is(TokenType::Semicolon) {
+            self.next_token();
+        }
 
         ast::ReturnStatement {
             token: return_keyword,
