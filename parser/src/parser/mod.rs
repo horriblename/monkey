@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 use lexer::{
     lexer::Lexer,
@@ -10,9 +10,15 @@ use lexer::{
 use crate::ast::{self, Expression};
 
 #[derive(Debug)]
-struct ParseError(String);
+pub struct ParseError(String);
 
-struct Parser {
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+pub struct Parser {
     // TODO reimplement using Lexer.iter(), possibly with Peekable
     lexer: Lexer,
     curr_token: Token,
