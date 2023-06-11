@@ -1,7 +1,7 @@
 const PROMPT: &str = "> ";
-use ::parser::ast::representation::StringRepr;
+
 use lexer::lexer;
-use parser::parser;
+use parser::{ast, parse};
 use std::io::{self, Write};
 
 #[inline]
@@ -11,7 +11,7 @@ fn stdin_next_line() -> io::Result<String> {
     Ok(buffer)
 }
 
-fn print_parse_errors(errors: &Vec<parser::ParseError>) {
+fn print_parse_errors(errors: &Vec<parse::ParseError>) {
     eprintln!("parse errors:");
     for err in errors {
         eprintln!("\t{}", err);
@@ -37,7 +37,7 @@ fn main() {
         let command = command_result.unwrap();
 
         let lexer = lexer::Lexer::new(command);
-        let mut parser = parser::Parser::new(lexer);
+        let mut parser = parse::Parser::new(lexer);
         let program = parser.parse_program();
 
         let parse_errors = parser.get_errors();
@@ -46,6 +46,7 @@ fn main() {
             continue;
         }
 
-        println!("{}", program.string_repr());
+        let evaluated = evaluator::eval::eval(&ast::Node::Prog(program));
+        println!("{}", evaluated.inspect());
     }
 }

@@ -14,6 +14,7 @@ type ExpectedChild<T> = Option<Rc<RefCell<T>>>;
 
 #[derive(Debug)]
 pub enum Node {
+    Prog(Program),
     Stmt(Statement),
     Expr(Expression),
 }
@@ -154,6 +155,7 @@ pub mod representation {
     impl StringRepr for Node {
         fn string_repr(&self) -> String {
             match self {
+                Node::Prog(program) => program.string_repr(),
                 Node::Stmt(stmt) => stmt.string_repr(),
                 Node::Expr(expr) => expr.string_repr(),
             }
