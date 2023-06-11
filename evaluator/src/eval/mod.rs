@@ -54,7 +54,7 @@ fn eval_expression(expr: &ast::Expression) -> Box<dyn Object> {
         ast::Expression::InfixExpr(node) => {
             let left = eval_expression(&node.left_expr.borrow());
             let right = eval_expression(&node.right_expr.as_ref().unwrap().borrow());
-            eval_integer_infix_expression(&node.operator.literal, left.as_ref(), right.as_ref())
+            eval_infix_expression(&node.operator.literal, left.as_ref(), right.as_ref())
         }
         _ => todo!(),
     }
@@ -87,22 +87,27 @@ fn eval_minus_prefix_operator_expression(right: &dyn object::Object) -> Box<dyn 
     }
 }
 
-fn eval_integer_infix_expression(
+fn eval_infix_expression(
     operator: &str,
     left: &dyn object::Object,
     right: &dyn object::Object,
 ) -> Box<dyn Object> {
-    let left_val = if let object::ObjectValue::Int(x) = left.value() {
-        x
-    } else {
-        todo!("Non int infix operand")
-    };
-    let right_val = if let object::ObjectValue::Int(x) = right.value() {
-        x
-    } else {
-        todo!("Non int infix operand")
-    };
+    if let object::ObjectValue::Int(left_val) = left.value() {
+        if let object::ObjectValue::Int(right_val) = right.value() {
+            return eval_integer_infix_expression(operator, left_val, right_val);
+        }
+    }
 
+    // NOTE: in the book pointer comparison is used to get slightly better performance. We can't do
+    // that here tho
+    match operator {
+        "==" => return native_bool_to_boolean_object(left.value() == right.value()),
+        "!=" => return native_bool_to_boolean_object(left.value() != right.value()),
+        _ => Box::new(NULL),
+    }
+}
+
+fn eval_integer_infix_expression(operator: &str, left_val: i64, right_val: i64) -> Box<dyn Object> {
     match operator {
         "+" => Box::new(object::Integer {
             value: left_val + right_val,
@@ -116,8 +121,16 @@ fn eval_integer_infix_expression(
         "/" => Box::new(object::Integer {
             value: left_val / right_val,
         }),
+        "<" => native_bool_to_boolean_object(left_val < right_val),
+        ">" => native_bool_to_boolean_object(left_val > right_val),
+        "==" => native_bool_to_boolean_object(left_val == right_val),
+        "!=" => native_bool_to_boolean_object(left_val != right_val),
         _ => Box::new(NULL),
     }
+}
+
+fn native_bool_to_boolean_object(val: bool) -> Box<object::Boolean> {
+    Box::new(if val { TRUE } else { FALSE })
 }
 
 #[cfg(test)]

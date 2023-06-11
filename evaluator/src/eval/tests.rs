@@ -87,6 +87,42 @@ fn test_eval_boolean_expression() {
             input: "false",
             expected: false,
         },
+        Test {
+            input: "true == true",
+            expected: true,
+        },
+        Test {
+            input: "false == false",
+            expected: true,
+        },
+        Test {
+            input: "true == false",
+            expected: false,
+        },
+        Test {
+            input: "true != false",
+            expected: true,
+        },
+        Test {
+            input: "false != true",
+            expected: true,
+        },
+        Test {
+            input: "(1 < 2) == true",
+            expected: true,
+        },
+        Test {
+            input: "(1 < 2) == false",
+            expected: false,
+        },
+        Test {
+            input: "(1 > 2) == true",
+            expected: false,
+        },
+        Test {
+            input: "(1 > 2) == false",
+            expected: true,
+        },
     ];
 
     for test in tests {
