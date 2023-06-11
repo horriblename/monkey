@@ -141,3 +141,79 @@ fn test_bang_operator() {
         test_boolean_object(evaluated.as_ref(), test.expected).unwrap();
     }
 }
+
+#[test]
+fn test_infix_operator() {
+    struct Test {
+        input: &'static str,
+        expected: i64,
+    }
+
+    let tests = vec![
+        Test {
+            input: "5",
+            expected: 5,
+        },
+        Test {
+            input: "10",
+            expected: 10,
+        },
+        Test {
+            input: "-5",
+            expected: -5,
+        },
+        Test {
+            input: "-10",
+            expected: -10,
+        },
+        Test {
+            input: "5 + 5 + 5 + 5 - 10",
+            expected: 10,
+        },
+        Test {
+            input: "2 * 2 * 2 * 2 * 2",
+            expected: 32,
+        },
+        Test {
+            input: "-50 + 100 + -50",
+            expected: 0,
+        },
+        Test {
+            input: "5 * 2 + 10",
+            expected: 20,
+        },
+        Test {
+            input: "5 + 2 * 10",
+            expected: 25,
+        },
+        Test {
+            input: "20 + 2 * -10",
+            expected: 0,
+        },
+        Test {
+            input: "50 / 2 * 2 + 10",
+            expected: 60,
+        },
+        Test {
+            input: "2 * (5 + 10)",
+            expected: 30,
+        },
+        Test {
+            input: "3 * 3 * 3 + 10",
+            expected: 37,
+        },
+        Test {
+            input: "3 * (3 * 3) + 10",
+            expected: 37,
+        },
+        Test {
+            input: "(5 + 10 * 2 + 15 / 3) * 2 + -10",
+            expected: 50,
+        },
+    ];
+
+    for test in tests {
+        let evaluated = test_eval(test.input);
+        test_integer_object(evaluated.as_ref(), test.expected).unwrap();
+    }
+}

@@ -51,6 +51,11 @@ fn eval_expression(expr: &ast::Expression) -> Box<dyn Object> {
             );
             eval_prefix_expression(&node.operator.literal, right.as_ref())
         }
+        ast::Expression::InfixExpr(node) => {
+            let left = eval_expression(&node.left_expr.borrow());
+            let right = eval_expression(&node.right_expr.as_ref().unwrap().borrow());
+            eval_integer_infix_expression(&node.operator.literal, left.as_ref(), right.as_ref())
+        }
         _ => todo!(),
     }
 }
@@ -78,6 +83,39 @@ fn eval_bang_operator_expression(right: &dyn object::Object) -> Box<dyn Object> 
 fn eval_minus_prefix_operator_expression(right: &dyn object::Object) -> Box<dyn Object> {
     match right.value() {
         object::ObjectValue::Int(x) => Box::new(object::Integer { value: -x }),
+        _ => Box::new(NULL),
+    }
+}
+
+fn eval_integer_infix_expression(
+    operator: &str,
+    left: &dyn object::Object,
+    right: &dyn object::Object,
+) -> Box<dyn Object> {
+    let left_val = if let object::ObjectValue::Int(x) = left.value() {
+        x
+    } else {
+        todo!("Non int infix operand")
+    };
+    let right_val = if let object::ObjectValue::Int(x) = right.value() {
+        x
+    } else {
+        todo!("Non int infix operand")
+    };
+
+    match operator {
+        "+" => Box::new(object::Integer {
+            value: left_val + right_val,
+        }),
+        "-" => Box::new(object::Integer {
+            value: left_val - right_val,
+        }),
+        "*" => Box::new(object::Integer {
+            value: left_val * right_val,
+        }),
+        "/" => Box::new(object::Integer {
+            value: left_val / right_val,
+        }),
         _ => Box::new(NULL),
     }
 }
