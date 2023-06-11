@@ -40,6 +40,14 @@ fn test_eval_integer_expression() {
             input: "10",
             expected: 10,
         },
+        Test {
+            input: "-5",
+            expected: -5,
+        },
+        Test {
+            input: "-10",
+            expected: -10,
+        },
     ];
 
     for test in tests {
@@ -92,4 +100,44 @@ fn test_boolean_object(obj: &dyn Object, expected: bool) -> TResult<()> {
     check_eq!(ObjectValue::Bool(expected), obj.value())?;
 
     Ok(())
+}
+
+#[test]
+fn test_bang_operator() {
+    struct Test {
+        input: &'static str,
+        expected: bool,
+    }
+
+    let tests = vec![
+        Test {
+            input: "!true",
+            expected: false,
+        },
+        Test {
+            input: "!false",
+            expected: true,
+        },
+        Test {
+            input: "!5",
+            expected: false,
+        },
+        Test {
+            input: "!!true",
+            expected: true,
+        },
+        Test {
+            input: "!!false",
+            expected: false,
+        },
+        Test {
+            input: "!!5",
+            expected: true,
+        },
+    ];
+
+    for test in tests {
+        let evaluated = test_eval(test.input);
+        test_boolean_object(evaluated.as_ref(), test.expected).unwrap();
+    }
 }

@@ -41,7 +41,44 @@ fn eval_expression(expr: &ast::Expression) -> Box<dyn Object> {
         ast::Expression::Int(node) => Box::new(object::Integer { value: node.value }),
         // TODO: return const TRUE/FALSE to reduce object creations
         ast::Expression::Bool(node) => Box::new(object::Boolean { value: node.value }),
+        ast::Expression::PrefixExpr(node) => {
+            let right = eval_expression(
+                &node
+                    .operand
+                    .as_ref()
+                    .expect("Unchecked Parse Error!")
+                    .borrow(),
+            );
+            eval_prefix_expression(&node.operator.literal, right.as_ref())
+        }
         _ => todo!(),
+    }
+}
+
+fn eval_prefix_expression(operator: &str, right: &dyn object::Object) -> Box<dyn Object> {
+    match operator {
+        "!" => eval_bang_operator_expression(right),
+        "-" => eval_minus_prefix_operator_expression(right),
+        _ => Box::new(NULL), // TODO: avoid allocation
+    }
+}
+
+// NOTE: this implementation is far different from the book. In the book, boolean objects are
+// pointers that either point to the TRUE or FALSE const pointer, so they only had to check if
+// `right` points to TRUE/FALSE e.g. right == TRUE
+fn eval_bang_operator_expression(right: &dyn object::Object) -> Box<dyn Object> {
+    match right.value() {
+        object::ObjectValue::Bool(true) => Box::new(FALSE),
+        object::ObjectValue::Bool(false) => Box::new(TRUE),
+        object::ObjectValue::Null => Box::new(TRUE),
+        _ => Box::new(FALSE),
+    }
+}
+
+fn eval_minus_prefix_operator_expression(right: &dyn object::Object) -> Box<dyn Object> {
+    match right.value() {
+        object::ObjectValue::Int(x) => Box::new(object::Integer { value: -x }),
+        _ => Box::new(NULL),
     }
 }
 
