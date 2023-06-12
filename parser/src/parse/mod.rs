@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 use lexer::{
@@ -27,16 +25,6 @@ pub struct Parser {
     // I bet traits can do whatever we're trying here
     // prefix_parse_fns: HashMap<TokenType, Box<PrefixParseFn>>,
     // infix_parse_fns: HashMap<TokenType, Box<InfixParseFn>>,
-}
-
-type PrefixParseFn = dyn Fn() -> ast::Expression;
-
-// takes one argument: the "left side" of the infix operator
-type InfixParseFn = dyn Fn(ast::Expression) -> ast::Expression;
-
-enum Either<L, R> {
-    Left(L),
-    Right(R),
 }
 
 enum InfixType {
@@ -76,14 +64,14 @@ impl Parser {
         self.curr_token.type_ == t
     }
 
-    fn peek_token_is(&self, t: TokenType) -> bool {
+    fn _peek_token_is(&self, t: TokenType) -> bool {
         self.peek_token.type_ == t
     }
 
     /// `expect_peek` checks if the currently peeked token is the same type as `t`.
     /// If they are, advance the parser and return `true`, else return `false`.
     fn _expect_peek(&mut self, t: TokenType) -> bool {
-        if self.peek_token_is(t) {
+        if self._peek_token_is(t) {
             self.next_token();
             true
         } else {
@@ -95,7 +83,7 @@ impl Parser {
         Self::operator_precedence(&self.curr_token.type_)
     }
 
-    fn peek_precedence(&self) -> OperatorPrecedence {
+    fn _peek_precedence(&self) -> OperatorPrecedence {
         Self::operator_precedence(&self.peek_token.type_)
     }
 
