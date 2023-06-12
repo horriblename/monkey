@@ -61,23 +61,23 @@ fn test_let_statements() {
     struct Test {
         input: &'static str,
         expected_identifier: &'static str,
-        expected_value: LiteralValue,
+        expected_value: &'static str,
     }
     let tests = vec![
         Test {
             input: "let x = 5;",
             expected_identifier: "x",
-            expected_value: LiteralValue::Int(4),
+            expected_value: "5",
         },
         Test {
             input: "let y = true;",
             expected_identifier: "y",
-            expected_value: LiteralValue::Bool(true),
+            expected_value: "true",
         },
         Test {
             input: "let foobar = y;",
             expected_identifier: "foobar",
-            expected_value: LiteralValue::Str("y".to_string()),
+            expected_value: "y",
         },
     ];
 
@@ -96,7 +96,11 @@ fn test_let_statements() {
             test.expected_identifier,
             let_stmt.name.as_ref().unwrap().borrow().value
         );
-        assert!(test_let_statement(let_stmt, test.expected_identifier));
+        assert!(test_let_statement(
+            let_stmt,
+            test.expected_identifier,
+            test.expected_value
+        ));
     }
 }
 
@@ -138,11 +142,14 @@ fn test_return_statements() {
     }
 }
 
-fn test_let_statement(stmt: &LetStatement, name: &str) -> bool {
+fn test_let_statement(stmt: &LetStatement, name: &str, value: &str) -> bool {
     assert_eq!("let", stmt.token.literal);
 
     let name_node = stmt.name.as_ref().unwrap().borrow();
     assert_eq!(name, name_node.token.literal);
+
+    let value_node = stmt.value.as_ref().unwrap().borrow();
+    assert_eq!(value, value_node.string_repr());
     true
 }
 
