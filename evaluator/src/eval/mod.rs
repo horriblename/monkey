@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::ops::Deref;
+
 use parser::ast;
 
 use crate::object::{self, Object};
@@ -11,17 +13,21 @@ const NULL: object::Null = object::Null;
 // TODO: should be Option<_> (according to the book)
 pub fn eval(node: &ast::Node) -> Box<dyn Object> {
     match node {
-        ast::Node::Prog(program) => eval_statements(&program.statements),
+        ast::Node::Prog(program) => eval_statements(program.statements.iter()),
         ast::Node::Stmt(stmt) => eval_statement(stmt),
         ast::Node::Expr(expr) => eval_expression(expr),
     }
 }
 
-fn eval_statements(stmts: &[ast::Statement]) -> Box<dyn Object> {
+fn eval_statements<I, R>(stmts: I) -> Box<dyn Object>
+where
+    I: Iterator<Item = R>,
+    R: Deref<Target = ast::Statement>,
+{
     let mut res = None;
 
     for stmt in stmts {
-        res = Some(eval_statement(stmt));
+        res = Some(eval_statement(&stmt));
     }
 
     res.expect("TODO: handle statements of length 0")
@@ -56,6 +62,7 @@ fn eval_expression(expr: &ast::Expression) -> Box<dyn Object> {
             let right = eval_expression(&node.right_expr.as_ref().unwrap().borrow());
             eval_infix_expression(&node.operator.literal, left.as_ref(), right.as_ref())
         }
+        ast::Expression::IfExpr(node) => eval_if_expression(node),
         _ => todo!(),
     }
 }
@@ -131,6 +138,38 @@ fn eval_integer_infix_expression(operator: &str, left_val: i64, right_val: i64) 
 
 fn native_bool_to_boolean_object(val: bool) -> Box<object::Boolean> {
     Box::new(if val { TRUE } else { FALSE })
+}
+
+fn eval_if_expression(if_expr: &ast::IfExpression) -> Box<dyn Object> {
+    let condition = eval_expression(
+        &if_expr
+            .condition
+            .as_ref()
+            .expect("Unchecked Parse Error!")
+            .borrow(),
+    );
+
+    if is_truthy(condition.as_ref()) {
+        let consequence = if_expr.consequence.borrow();
+        let statements = consequence.statements.iter().map(|x| x.borrow());
+        eval_statements(statements)
+    } else if let Some(alt) = &if_expr.alternative {
+        let block = alt.as_ref().expect("Unchecked Parse Error!").borrow();
+        let statements = block.statements.iter().map(|x| x.borrow());
+        eval_statements(statements)
+    } else {
+        Box::new(object::Null)
+    }
+}
+
+/// an expression is considered truthy if: it is not null, and it is not boolean false
+fn is_truthy(condition: &dyn Object) -> bool {
+    // NOTE: pointer comparison was used in the book
+    match condition.value() {
+        object::ObjectValue::Null => false,
+        object::ObjectValue::Bool(cond) => cond,
+        _ => true,
+    }
 }
 
 #[cfg(test)]

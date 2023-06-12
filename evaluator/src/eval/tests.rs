@@ -253,3 +253,47 @@ fn test_infix_operator() {
         test_integer_object(evaluated.as_ref(), test.expected).unwrap();
     }
 }
+
+#[test]
+fn test_if_else_expressions() {
+    struct Test {
+        input: &'static str,
+        expected: ObjectValue,
+    }
+
+    let tests = vec![
+        Test {
+            input: "if (true) { 10 }",
+            expected: ObjectValue::Int(10),
+        },
+        Test {
+            input: "if (false) { 10 }",
+            expected: ObjectValue::Null,
+        },
+        Test {
+            input: "if (1) { 10 }",
+            expected: ObjectValue::Int(10),
+        },
+        Test {
+            input: "if (1 < 2) { 10 }",
+            expected: ObjectValue::Int(10),
+        },
+        Test {
+            input: "if (1 > 2) { 10 }",
+            expected: ObjectValue::Null,
+        },
+        Test {
+            input: "if (1 > 2) { 10 } else { 20 }",
+            expected: ObjectValue::Int(20),
+        },
+        Test {
+            input: "if (1 < 2) { 10 } else { 20 }",
+            expected: ObjectValue::Int(10),
+        },
+    ];
+
+    for test in tests {
+        let evaluated = test_eval(test.input);
+        assert_eq!(test.expected, evaluated.value());
+    }
+}
