@@ -7,73 +7,36 @@ pub enum ObjectType {
     Integer,
     Boolean,
     Null,
+    ReturnValue,
 }
 
-//  kind of redundant with ObjectType, might remove one later
-#[derive(Debug, PartialEq)]
-pub enum ObjectValue {
+#[derive(Debug)]
+pub enum Object {
     Int(i64),
     Bool(bool),
     Null,
+    ReturnValue(Box<Object>),
 }
 
-pub trait Object {
-    fn type_(&self) -> ObjectType;
-    fn inspect(&self) -> String;
-    fn value(&self) -> ObjectValue;
-}
-
-#[derive(Debug)]
-pub struct Integer {
-    pub value: i64,
-}
-
-impl Object for Integer {
-    fn type_(&self) -> ObjectType {
-        ObjectType::Integer
-    }
-
-    fn inspect(&self) -> String {
-        format!("{}", self.value)
-    }
-
-    fn value(&self) -> ObjectValue {
-        ObjectValue::Int(self.value)
+impl Object {
+    pub fn inspect(&self) -> String {
+        match self {
+            Self::Int(val) => format!("{}", val),
+            Self::Bool(val) => format!("{}", val),
+            Self::Null => "null".to_string(),
+            Self::ReturnValue(val) => val.inspect(),
+        }
     }
 }
 
-#[derive(Debug)]
-pub struct Boolean {
-    pub value: bool,
-}
-
-impl Object for Boolean {
-    fn type_(&self) -> ObjectType {
-        ObjectType::Boolean
-    }
-
-    fn inspect(&self) -> String {
-        format!("{}", self.value)
-    }
-
-    fn value(&self) -> ObjectValue {
-        ObjectValue::Bool(self.value)
-    }
-}
-
-#[derive(Debug)]
-pub struct Null;
-
-impl Object for Null {
-    fn type_(&self) -> ObjectType {
-        ObjectType::Null
-    }
-
-    fn inspect(&self) -> String {
-        "null".to_string()
-    }
-
-    fn value(&self) -> ObjectValue {
-        ObjectValue::Null
+impl PartialEq for Object {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Int(x), Self::Int(y)) => x == y,
+            (Self::Bool(x), Self::Bool(y)) => x == y,
+            (Self::Null, Self::Null) => true,
+            (Self::ReturnValue(x), Self::ReturnValue(y)) => x == y,
+            _ => false,
+        }
     }
 }

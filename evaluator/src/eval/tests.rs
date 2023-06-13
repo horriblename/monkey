@@ -1,4 +1,4 @@
-use crate::object::{Object, ObjectType, ObjectValue};
+use crate::object;
 use lexer::lexer::Lexer;
 use parser::{ast, parse::Parser};
 
@@ -52,11 +52,11 @@ fn test_eval_integer_expression() {
 
     for test in tests {
         let evaluated = test_eval(test.input);
-        test_integer_object(evaluated.as_ref(), test.expected).unwrap();
+        test_integer_object(&evaluated, test.expected).unwrap();
     }
 }
 
-fn test_eval(input: &str) -> Box<dyn Object> {
+fn test_eval(input: &str) -> object::Object {
     let lexer = Lexer::new(input.to_string());
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();
@@ -64,9 +64,8 @@ fn test_eval(input: &str) -> Box<dyn Object> {
     return super::eval(&ast::Node::Prog(program));
 }
 
-fn test_integer_object(obj: &dyn Object, expected: i64) -> TResult<()> {
-    check_eq!(ObjectType::Integer, obj.type_())?;
-    check_eq!(ObjectValue::Int(expected), obj.value())?;
+fn test_integer_object(obj: &object::Object, expected: i64) -> TResult<()> {
+    check_eq!(&object::Object::Int(expected), obj)?;
 
     Ok(())
 }
@@ -127,13 +126,12 @@ fn test_eval_boolean_expression() {
 
     for test in tests {
         let evaluated = test_eval(test.input);
-        test_boolean_object(evaluated.as_ref(), test.expected).unwrap();
+        test_boolean_object(&evaluated, test.expected).unwrap();
     }
 }
 
-fn test_boolean_object(obj: &dyn Object, expected: bool) -> TResult<()> {
-    check_eq!(ObjectType::Boolean, obj.type_())?;
-    check_eq!(ObjectValue::Bool(expected), obj.value())?;
+fn test_boolean_object(obj: &object::Object, expected: bool) -> TResult<()> {
+    check_eq!(&object::Object::Bool(expected), obj)?;
 
     Ok(())
 }
@@ -174,7 +172,7 @@ fn test_bang_operator() {
 
     for test in tests {
         let evaluated = test_eval(test.input);
-        test_boolean_object(evaluated.as_ref(), test.expected).unwrap();
+        test_boolean_object(&evaluated, test.expected).unwrap();
     }
 }
 
@@ -250,7 +248,7 @@ fn test_infix_operator() {
 
     for test in tests {
         let evaluated = test_eval(test.input);
-        test_integer_object(evaluated.as_ref(), test.expected).unwrap();
+        test_integer_object(&evaluated, test.expected).unwrap();
     }
 }
 
@@ -258,42 +256,74 @@ fn test_infix_operator() {
 fn test_if_else_expressions() {
     struct Test {
         input: &'static str,
-        expected: ObjectValue,
+        expected: object::Object,
     }
 
     let tests = vec![
         Test {
             input: "if (true) { 10 }",
-            expected: ObjectValue::Int(10),
+            expected: object::Object::Int(10),
         },
         Test {
             input: "if (false) { 10 }",
-            expected: ObjectValue::Null,
+            expected: object::Object::Null,
         },
         Test {
             input: "if (1) { 10 }",
-            expected: ObjectValue::Int(10),
+            expected: object::Object::Int(10),
         },
         Test {
             input: "if (1 < 2) { 10 }",
-            expected: ObjectValue::Int(10),
+            expected: object::Object::Int(10),
         },
         Test {
             input: "if (1 > 2) { 10 }",
-            expected: ObjectValue::Null,
+            expected: object::Object::Null,
         },
         Test {
             input: "if (1 > 2) { 10 } else { 20 }",
-            expected: ObjectValue::Int(20),
+            expected: object::Object::Int(20),
         },
         Test {
             input: "if (1 < 2) { 10 } else { 20 }",
-            expected: ObjectValue::Int(10),
+            expected: object::Object::Int(10),
         },
     ];
 
     for test in tests {
         let evaluated = test_eval(test.input);
-        assert_eq!(test.expected, evaluated.value());
+        assert_eq!(test.expected, evaluated);
+    }
+}
+
+#[test]
+fn test_return_statements() {
+    struct Test {
+        input: &'static str,
+        expected: i64,
+    }
+
+    let tests = vec![
+        Test {
+            input: "return 10;",
+            expected: 10,
+        },
+        Test {
+            input: "return 10; 9;",
+            expected: 10,
+        },
+        Test {
+            input: "return 2 * 5; 9;",
+            expected: 10,
+        },
+        Test {
+            input: "9; return 2 * 5; 9;",
+            expected: 10,
+        },
+    ];
+
+    for test in tests {
+        let evaluated = test_eval(test.input);
+        assert_eq!(object::Object::Int(test.expected), evaluated);
     }
 }
