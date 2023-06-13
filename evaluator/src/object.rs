@@ -1,6 +1,3 @@
-//! I went ham on enums and other rust constructs when writing the parser, but I'm gonna tune it
-//! down a bit as evaluators are completely uncharted territory for me. This part will be written as
-//! closely to the go code in the book as possible, at least for now.
 
 #[derive(Debug, PartialEq)]
 pub enum ObjectType {
