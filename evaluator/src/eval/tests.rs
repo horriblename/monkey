@@ -1,4 +1,4 @@
-use crate::object;
+use crate::{error::EResult, object};
 use lexer::lexer::Lexer;
 use parser::{ast, parse::Parser};
 
@@ -51,12 +51,12 @@ fn test_eval_integer_expression() {
     ];
 
     for test in tests {
-        let evaluated = test_eval(test.input);
+        let evaluated = test_eval(test.input).unwrap();
         test_integer_object(&evaluated, test.expected).unwrap();
     }
 }
 
-fn test_eval(input: &str) -> object::Object {
+fn test_eval(input: &str) -> EResult<object::Object> {
     let lexer = Lexer::new(input.to_string());
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();
@@ -125,7 +125,7 @@ fn test_eval_boolean_expression() {
     ];
 
     for test in tests {
-        let evaluated = test_eval(test.input);
+        let evaluated = test_eval(test.input).unwrap();
         test_boolean_object(&evaluated, test.expected).unwrap();
     }
 }
@@ -171,7 +171,7 @@ fn test_bang_operator() {
     ];
 
     for test in tests {
-        let evaluated = test_eval(test.input);
+        let evaluated = test_eval(test.input).unwrap();
         test_boolean_object(&evaluated, test.expected).unwrap();
     }
 }
@@ -247,7 +247,7 @@ fn test_infix_operator() {
     ];
 
     for test in tests {
-        let evaluated = test_eval(test.input);
+        let evaluated = test_eval(test.input).unwrap();
         test_integer_object(&evaluated, test.expected).unwrap();
     }
 }
@@ -291,7 +291,7 @@ fn test_if_else_expressions() {
     ];
 
     for test in tests {
-        let evaluated = test_eval(test.input);
+        let evaluated = test_eval(test.input).unwrap();
         assert_eq!(test.expected, evaluated);
     }
 }
@@ -323,7 +323,63 @@ fn test_return_statements() {
     ];
 
     for test in tests {
-        let evaluated = test_eval(test.input);
+        let evaluated = test_eval(test.input).unwrap();
         assert_eq!(object::Object::Int(test.expected), evaluated);
+    }
+}
+
+#[test]
+fn test_error_handling() {
+    struct Test {
+        input: &'static str,
+        expected_msg: &'static str,
+    }
+
+    let tests = vec![
+        Test {
+            input: "5 + true;",
+            expected_msg: "type mismatch: Integer + Boolean",
+        },
+        Test {
+            input: "5 + true; 5;",
+            expected_msg: "type mismatch: Integer + Boolean",
+        },
+        Test {
+            input: "-true",
+            expected_msg: "unknown operator: -Boolean",
+        },
+        Test {
+            input: "true + false;",
+            expected_msg: "unknown operator: Boolean + Boolean",
+        },
+        Test {
+            input: "5; true + false; 5",
+            expected_msg: "unknown operator: Boolean + Boolean",
+        },
+        Test {
+            input: "if (10 > 1) { true + false; }",
+            expected_msg: "unknown operator: Boolean + Boolean",
+        },
+        Test {
+            input: "
+                if (10 > 1) {
+                    if (10 > 1) {
+                        return true + false;
+                    }
+
+                    return 1;
+                }
+                ",
+            expected_msg: "unknown operator: Boolean + Boolean",
+        },
+    ];
+
+    for test in tests {
+        let evaluated = test_eval(test.input);
+        let err = evaluated.as_ref().expect_err(&format!(
+            "expected error with message {}, got {:?}",
+            test.expected_msg, &evaluated
+        ));
+        assert_eq!(test.expected_msg, format!("{:?}", err));
     }
 }

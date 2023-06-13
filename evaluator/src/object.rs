@@ -24,6 +24,16 @@ impl Object {
             Self::ReturnValue(val) => val.inspect(),
         }
     }
+
+    // TODO: is there no better way? :(
+    pub fn type_(&self) -> ObjectType {
+        match self {
+            Self::Int(_) => ObjectType::Integer,
+            Self::Bool(_) => ObjectType::Boolean,
+            Self::Null => ObjectType::Null,
+            Self::ReturnValue(_) => ObjectType::ReturnValue,
+        }
+    }
 }
 
 impl PartialEq for Object {

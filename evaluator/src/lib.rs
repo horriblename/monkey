@@ -10,3 +10,5 @@ pub mod eval;
 /// an interface of our design. Every value will be wrapped inside a struct, which fulfills this
 /// `Object` interface.
 pub mod object;
+
+pub mod error;

@@ -47,6 +47,6 @@ fn main() {
         }
 
         let evaluated = evaluator::eval::eval(&ast::Node::Prog(program));
-        println!("{}", evaluated.inspect());
+        println!("{}", evaluated.expect("TODO: error handling").inspect());
     }
 }
