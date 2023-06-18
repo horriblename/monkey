@@ -7,6 +7,7 @@ pub type EResult<T> = Result<T, EvalError>;
 pub enum EvalError {
     UnknownPrefixOp(UnknownPrefixOperator),
     InfixOpErr(InfixOpError),
+    UnknownIdent(UnknownIdentifier),
 }
 
 impl Display for EvalError {
@@ -14,6 +15,7 @@ impl Display for EvalError {
         match self {
             Self::UnknownPrefixOp(variant) => Display::fmt(variant, f),
             Self::InfixOpErr(variant) => Display::fmt(variant, f),
+            Self::UnknownIdent(variant) => Display::fmt(variant, f),
         }
     }
 }
@@ -57,22 +59,6 @@ pub struct InfixOpError {
     pub right_type: object::ObjectType,
 }
 
-impl InfixOpError {
-    fn new(
-        error_type: InfixOpErrorType,
-        left_type: object::ObjectType,
-        operator: String,
-        right_type: object::ObjectType,
-    ) -> Self {
-        Self {
-            error_type,
-            left_type,
-            operator,
-            right_type,
-        }
-    }
-}
-
 impl Debug for InfixOpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.error_type {
@@ -91,6 +77,22 @@ impl Debug for InfixOpError {
 }
 
 impl Display for InfixOpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(self, f)
+    }
+}
+
+pub struct UnknownIdentifier {
+    pub name: String,
+}
+
+impl Debug for UnknownIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "identifier not found: {}", self.name)
+    }
+}
+
+impl Display for UnknownIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(self, f)
     }

@@ -52,16 +52,17 @@ fn test_eval_integer_expression() {
 
     for test in tests {
         let evaluated = test_eval(test.input).unwrap();
-        test_integer_object(&evaluated, test.expected).unwrap();
+        test_integer_object(&evaluated.borrow(), test.expected).unwrap();
     }
 }
 
-fn test_eval(input: &str) -> EResult<object::Object> {
+fn test_eval(input: &str) -> EResult<object::ObjectRc> {
     let lexer = Lexer::new(input.to_string());
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();
+    let mut env = object::Environment::new();
 
-    return super::eval(&ast::Node::Prog(program));
+    return super::eval(&ast::Node::Prog(program), &mut env);
 }
 
 fn test_integer_object(obj: &object::Object, expected: i64) -> TResult<()> {
@@ -126,7 +127,7 @@ fn test_eval_boolean_expression() {
 
     for test in tests {
         let evaluated = test_eval(test.input).unwrap();
-        test_boolean_object(&evaluated, test.expected).unwrap();
+        test_boolean_object(&evaluated.borrow(), test.expected).unwrap();
     }
 }
 
@@ -172,7 +173,7 @@ fn test_bang_operator() {
 
     for test in tests {
         let evaluated = test_eval(test.input).unwrap();
-        test_boolean_object(&evaluated, test.expected).unwrap();
+        test_boolean_object(&evaluated.borrow(), test.expected).unwrap();
     }
 }
 
@@ -248,7 +249,7 @@ fn test_infix_operator() {
 
     for test in tests {
         let evaluated = test_eval(test.input).unwrap();
-        test_integer_object(&evaluated, test.expected).unwrap();
+        test_integer_object(&evaluated.borrow(), test.expected).unwrap();
     }
 }
 
@@ -292,7 +293,7 @@ fn test_if_else_expressions() {
 
     for test in tests {
         let evaluated = test_eval(test.input).unwrap();
-        assert_eq!(test.expected, evaluated);
+        assert_eq!(&test.expected, &*evaluated.borrow());
     }
 }
 
@@ -324,7 +325,7 @@ fn test_return_statements() {
 
     for test in tests {
         let evaluated = test_eval(test.input).unwrap();
-        assert_eq!(object::Object::Int(test.expected), evaluated);
+        assert_eq!(&object::Object::Int(test.expected), &*evaluated.borrow());
     }
 }
 
@@ -372,6 +373,10 @@ fn test_error_handling() {
                 ",
             expected_msg: "unknown operator: Boolean + Boolean",
         },
+        Test {
+            input: "foobar",
+            expected_msg: "identifier not found: foobar",
+        },
     ];
 
     for test in tests {
@@ -381,5 +386,38 @@ fn test_error_handling() {
             test.expected_msg, &evaluated
         ));
         assert_eq!(test.expected_msg, format!("{:?}", err));
+    }
+}
+
+#[test]
+fn test_let_statement() {
+    struct Test {
+        input: &'static str,
+        expected: i64,
+    }
+
+    let tests = vec![
+        Test {
+            input: "let a = 5; a;",
+            expected: 5,
+        },
+        Test {
+            input: "let a = 5 * 5; a;",
+            expected: 25,
+        },
+        Test {
+            input: "let a = 5; let b = a; b;",
+            expected: 5,
+        },
+        Test {
+            input: "let a = 5; let b = a; let c = a + b + 5; c;",
+            expected: 15,
+        },
+    ];
+
+    for test in tests {
+        let obj = &test_eval(test.input).unwrap();
+        // let var = cast_variant!(obj, object::Object::Variable).unwrap();
+        test_integer_object(&obj.borrow(), test.expected).unwrap();
     }
 }
