@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Display, rc::Rc};
+use std::fmt::Display;
 
 use lexer::{
     lexer::Lexer,
@@ -155,17 +155,17 @@ impl Parser {
 
         let name = self.expect_next(TokenType::Ident).and_then(|tok| {
             let literal = tok.literal.clone();
-            Some(Rc::new(RefCell::new(ast::Identifier {
+            Some(Box::new(ast::Identifier {
                 token: tok,
                 value: literal,
-            })))
+            }))
         });
 
         self.expect_next(TokenType::Assign);
 
         let value = self
             .parse_expression(OperatorPrecedence::Lowest)
-            .map(wrap_in_rc_refcell);
+            .map(Box::new);
 
         if self.curr_token_is(TokenType::Semicolon) {
             self.next_token();
@@ -184,7 +184,7 @@ impl Parser {
 
         let expr = self
             .parse_expression(OperatorPrecedence::Lowest)
-            .map(wrap_in_rc_refcell);
+            .map(Box::new);
 
         if self.curr_token_is(TokenType::Semicolon) {
             self.next_token();
@@ -201,7 +201,7 @@ impl Parser {
     fn parse_expression_statement(&mut self) -> Option<ast::ExpressionStatement> {
         let expr = self
             .parse_expression(OperatorPrecedence::Lowest)
-            .map(wrap_in_rc_refcell);
+            .map(Box::new);
 
         // NOTE: this is not in the book and I can't remember why I added it :P
         if expr.is_none() && !self.curr_token_is(TokenType::Semicolon) {
@@ -279,7 +279,7 @@ impl Parser {
         let operator = self.next_token();
         let operand = self
             .parse_expression(OperatorPrecedence::Prefix)
-            .map(|expr| Rc::new(RefCell::new(expr)));
+            .map(|expr| Box::new(expr));
 
         ast::PrefixExpression { operator, operand }
     }
@@ -308,9 +308,9 @@ impl Parser {
         let right = self.parse_expression(precedence);
 
         ast::InfixExpression {
-            left_expr: Rc::new(RefCell::new(left)),
+            left_expr: Box::new(left),
             operator,
-            right_expr: right.map(|right| Rc::new(RefCell::new(right))),
+            right_expr: right.map(|right| Box::new(right)),
         }
     }
 
@@ -321,12 +321,12 @@ impl Parser {
         let args = self
             .parse_call_arguments()
             .into_iter()
-            .map(|arg| arg.map(wrap_in_rc_refcell))
+            .map(|arg| arg.map(Box::new))
             .collect();
 
         ast::CallExpression {
             token,
-            function: Rc::new(RefCell::new(left)),
+            function: Box::new(left),
             arguments: args,
         }
     }
@@ -389,19 +389,19 @@ impl Parser {
 
         let condition = self
             .parse_expression(OperatorPrecedence::Lowest)
-            .map(wrap_in_rc_refcell);
+            .map(Box::new);
 
         self.expect_next(TokenType::RParen)?;
 
         self.expect_next(TokenType::LBrace)?;
 
-        let consequence = Rc::new(RefCell::new(self.parse_block_expression()));
+        let consequence = self.parse_block_expression();
 
         let alternative = if self.curr_token_is(TokenType::Else) {
             Some({
                 self.next_token();
                 self.expect_next(TokenType::LBrace)?;
-                Some(Rc::new(RefCell::new(self.parse_block_expression())))
+                Some(self.parse_block_expression())
             })
         } else {
             None
@@ -429,11 +429,11 @@ impl Parser {
         Some(ast::FunctionLiteral {
             token,
             parameters,
-            body: Rc::new(RefCell::new(body)),
+            body,
         })
     }
 
-    fn parse_function_parameters(&mut self) -> Option<Vec<Rc<RefCell<ast::Identifier>>>> {
+    fn parse_function_parameters(&mut self) -> Option<Vec<ast::Identifier>> {
         let mut params = Vec::new();
 
         if self.curr_token_is(TokenType::RParen) {
@@ -446,7 +446,7 @@ impl Parser {
             value: param.literal.clone(),
             token: param,
         };
-        params.push(Rc::new(RefCell::new(ident)));
+        params.push(ident);
 
         while self.curr_token_is(TokenType::Comma) {
             self.next_token();
@@ -456,7 +456,7 @@ impl Parser {
                     value: param.literal.clone(),
                     token: param,
                 };
-                params.push(Rc::new(RefCell::new(ident)));
+                params.push(ident);
             }
         }
 
@@ -470,7 +470,7 @@ impl Parser {
 
         while !self.curr_token_is(TokenType::RBrace) {
             if let Some(stmt) = self.parse_maybe_statement() {
-                statements.push(Rc::new(RefCell::new(stmt)));
+                statements.push(Box::new(stmt));
             } else {
                 break;
             }
@@ -529,10 +529,6 @@ enum OperatorPrecedence {
     Product = 4,     // *
     Prefix = 5,      // -X or !X
     Call = 6,        // myFunction(X)
-}
-
-fn wrap_in_rc_refcell<T>(val: T) -> Rc<RefCell<T>> {
-    Rc::new(RefCell::new(val))
 }
 
 #[cfg(test)]

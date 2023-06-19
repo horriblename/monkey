@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use super::Parser;
 use crate::ast::{
     representation::StringRepr, Expression, Identifier, LetStatement, Program, Statement,
@@ -94,7 +92,7 @@ fn test_let_statements() {
         let let_stmt = cast_variant!(&let_stmt, Statement::Let).unwrap();
         assert_eq!(
             test.expected_identifier,
-            let_stmt.name.as_ref().unwrap().borrow().value
+            let_stmt.name.as_ref().unwrap().value
         );
         assert!(test_let_statement(
             let_stmt,
@@ -137,7 +135,7 @@ fn test_return_statements() {
         assert_eq!(TokenType::Return, return_stmt.token.type_);
         assert_eq!("return", return_stmt.token.literal);
 
-        let return_expr = &*return_stmt.expr.as_ref().unwrap().borrow();
+        let return_expr = &*return_stmt.expr.as_ref().unwrap();
         test_literal_expression(return_expr, &test.expected_value).unwrap();
     }
 }
@@ -145,10 +143,10 @@ fn test_return_statements() {
 fn test_let_statement(stmt: &LetStatement, name: &str, value: &str) -> bool {
     assert_eq!("let", stmt.token.literal);
 
-    let name_node = stmt.name.as_ref().unwrap().borrow();
+    let name_node = stmt.name.as_ref().unwrap();
     assert_eq!(name, name_node.token.literal);
 
-    let value_node = stmt.value.as_ref().unwrap().borrow();
+    let value_node = stmt.value.as_ref().unwrap();
     assert_eq!(value, value_node.string_repr());
     true
 }
@@ -172,20 +170,20 @@ fn test_string_repr() {
                 type_: TokenType::Let,
                 literal: "let".to_string(),
             },
-            name: Some(Rc::new(RefCell::new(Identifier {
+            name: Some(Box::new(Identifier {
                 token: Token {
                     type_: TokenType::Ident,
                     literal: "myVar".to_string(),
                 },
                 value: "myVar".to_string(),
-            }))),
-            value: Some(Rc::new(RefCell::new(Expression::Ident(Identifier {
+            })),
+            value: Some(Box::new(Expression::Ident(Identifier {
                 token: Token {
                     type_: TokenType::Ident,
                     literal: "anotherVar".to_string(),
                 },
                 value: "anotherVar".to_string(),
-            })))),
+            }))),
         })],
     };
 
@@ -210,7 +208,7 @@ fn test_identifier_expression() {
 
     if let Statement::Expr(expr) = &program.statements[0] {
         let expr = expr.expr.as_ref().unwrap();
-        if let Expression::Ident(ident) = &*expr.borrow() {
+        if let Expression::Ident(ident) = &**expr {
             assert_eq!("foobar", ident.value);
             assert_eq!("foobar", ident.token.literal);
         } else {
@@ -239,7 +237,7 @@ fn test_int_expression() {
 
     if let Statement::Expr(expr) = &program.statements[0] {
         let expr = expr.expr.as_ref().expect("expected Expression, got None");
-        if let Expression::Int(integer) = &*expr.borrow() {
+        if let Expression::Int(integer) = &**expr {
             assert_eq!(5, integer.value);
             assert_eq!("5", integer.token.literal);
         } else {
@@ -284,15 +282,14 @@ fn test_parsing_prefix_expressions() {
             .unwrap()
             .expr
             .as_ref()
-            .unwrap()
-            .borrow();
+            .unwrap();
 
-        let prefix_expr = cast_variant!(expr, Expression::PrefixExpr).unwrap();
+        let prefix_expr = cast_variant!(&**expr, Expression::PrefixExpr).unwrap();
 
         assert_eq!(t.operator, prefix_expr.operator.literal);
 
-        let right_expr = &*prefix_expr.operand.as_ref().unwrap().borrow();
-        let rvalue = cast_variant!(right_expr, Expression::Int).unwrap();
+        let right_expr = &*prefix_expr.operand.as_ref().unwrap();
+        let rvalue = cast_variant!(&**right_expr, Expression::Int).unwrap();
 
         assert_eq!(t.integer_value, rvalue.value);
     }
@@ -374,14 +371,14 @@ fn test_parsing_infix_expressions() {
 
         let stmt = &program.statements[0];
         let expr_stmt = cast_variant!(stmt, Statement::Expr).unwrap();
-        let expr = &*expr_stmt.expr.as_ref().unwrap().borrow();
-        let infix_expr = cast_variant!(expr, Expression::InfixExpr).unwrap();
+        let expr = &*expr_stmt.expr.as_ref().unwrap();
+        let infix_expr = cast_variant!(&**expr, Expression::InfixExpr).unwrap();
 
         assert_eq!(test.operator, infix_expr.operator.literal);
-        let left_expr = &*infix_expr.left_expr.borrow();
+        let left_expr = &*infix_expr.left_expr;
         test_literal_expression(left_expr, &test.left_value).unwrap();
 
-        let right_expr = &*infix_expr.right_expr.as_ref().unwrap().borrow();
+        let right_expr = &*infix_expr.right_expr.as_ref().unwrap();
         test_literal_expression(right_expr, &test.right_value).unwrap();
 
         println!("{}", program.string_repr());
@@ -576,11 +573,11 @@ fn test_infix_expression(
 ) -> TResult<()> {
     let op_expr = cast_variant!(expr, Expression::InfixExpr).or_else(print_error)?;
 
-    test_literal_expression(&*op_expr.left_expr.borrow(), &left)?;
+    test_literal_expression(&*op_expr.left_expr, &left)?;
 
     check_eq!(operator, &op_expr.operator.literal).or_else(print_error)?;
 
-    test_literal_expression(&*op_expr.right_expr.as_ref().unwrap().borrow(), &right)?;
+    test_literal_expression(&*op_expr.right_expr.as_ref().unwrap(), &right)?;
 
     Ok(())
 }
@@ -615,28 +612,24 @@ fn test_if_expression() {
 
     let stmt = &cast_variant!(&program.statements[0], Statement::Expr).unwrap();
 
-    let stmt = stmt
-        .expr
-        .as_ref()
-        .expect("expected Expression, got None")
-        .borrow();
-    let expr = cast_variant!(&*stmt, Expression::IfExpr).unwrap();
+    let stmt = stmt.expr.as_ref().expect("expected Expression, got None");
+    let expr = cast_variant!(&**stmt, Expression::IfExpr).unwrap();
 
     test_infix_expression(
-        &expr.condition.as_ref().unwrap().borrow(),
+        &expr.condition.as_ref().unwrap(),
         &LiteralValue::Str("x".to_string()),
         "<",
         &LiteralValue::Str("y".to_string()),
     )
     .unwrap();
 
-    assert_eq!(1, expr.consequence.borrow().statements.len());
+    assert_eq!(1, expr.consequence.statements.len());
 
-    let expr = expr.consequence.borrow();
-    let consequence = &*expr.statements[0].borrow();
+    let expr = &expr.consequence;
+    let consequence = &*expr.statements[0];
     let consequence = cast_variant!(consequence, Statement::Expr).unwrap();
 
-    test_identifier(&consequence.expr.as_ref().unwrap().borrow(), "x").unwrap();
+    test_identifier(&consequence.expr.as_ref().unwrap(), "x").unwrap();
 }
 
 #[test]
@@ -651,40 +644,30 @@ fn test_if_else_expression() {
 
     let stmt = &cast_variant!(&program.statements[0], Statement::Expr).unwrap();
 
-    let stmt = stmt
-        .expr
-        .as_ref()
-        .expect("expected Expression, got None")
-        .borrow();
-    let expr = cast_variant!(&*stmt, Expression::IfExpr).unwrap();
+    let stmt = stmt.expr.as_ref().expect("expected Expression, got None");
+    let expr = cast_variant!(&**stmt, Expression::IfExpr).unwrap();
 
     test_infix_expression(
-        &expr.condition.as_ref().unwrap().borrow(),
+        &expr.condition.as_ref().unwrap(),
         &LiteralValue::Str("x".to_string()),
         "<",
         &LiteralValue::Str("y".to_string()),
     )
     .unwrap();
 
-    assert_eq!(1, expr.consequence.borrow().statements.len());
+    assert_eq!(1, expr.consequence.statements.len());
 
-    let consequence = expr.consequence.borrow();
-    let consequence = &*consequence.statements[0].borrow();
+    let consequence = &expr.consequence;
+    let consequence = &*consequence.statements[0];
     let consequence = cast_variant!(consequence, Statement::Expr).unwrap();
 
-    test_identifier(&consequence.expr.as_ref().unwrap().borrow(), "x").unwrap();
+    test_identifier(&consequence.expr.as_ref().unwrap(), "x").unwrap();
 
-    let alt = expr
-        .alternative
-        .as_ref()
-        .unwrap()
-        .as_ref()
-        .unwrap()
-        .borrow();
-    let alt = &*alt.statements[0].borrow();
+    let alt = expr.alternative.as_ref().unwrap().as_ref().unwrap();
+    let alt = &*alt.statements[0];
     let alt = cast_variant!(alt, Statement::Expr).unwrap();
 
-    test_identifier(&alt.expr.as_ref().unwrap().borrow(), "y").unwrap();
+    test_identifier(&alt.expr.as_ref().unwrap(), "y").unwrap();
 }
 
 #[test]
@@ -697,13 +680,13 @@ fn test_function_literal_parsing() {
 
     assert_eq!(1, program.statements.len());
     let expr = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
-    let expr = &*expr.expr.as_ref().unwrap().borrow();
-    let func = cast_variant!(expr, Expression::Fn).unwrap();
+    let expr = &*expr.expr.as_ref().unwrap();
+    let func = cast_variant!(&**expr, Expression::Fn).unwrap();
 
     let params = func.parameters.as_ref().unwrap();
     assert_eq!(2, params.len());
 
-    let param_1 = params[0].borrow().clone();
+    let param_1 = params[0].clone();
     // let param_1 = binding.borrow();
     test_literal_expression(
         &Expression::Ident(param_1),
@@ -711,7 +694,7 @@ fn test_function_literal_parsing() {
     )
     .unwrap();
 
-    let param_2 = params[1].borrow().clone();
+    let param_2 = params[1].clone();
     test_literal_expression(
         &Expression::Ident(param_2),
         &LiteralValue::Str("y".to_string()),
@@ -748,14 +731,14 @@ fn test_function_parameter_parsing() {
         check_parse_errors(&parser);
 
         let stmt = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
-        let stmt = stmt.expr.as_ref().unwrap().borrow();
-        let func = cast_variant!(&*stmt, Expression::Fn).unwrap();
+        let stmt = stmt.expr.as_ref().unwrap();
+        let func = cast_variant!(&**stmt, Expression::Fn).unwrap();
 
         let params = func.parameters.as_ref().unwrap();
         assert_eq!(test.expected_params.len(), params.len());
 
         for (expected, got) in test.expected_params.iter().zip(params) {
-            let ident = got.borrow().clone();
+            let ident = got.clone();
             let expected = LiteralValue::Str(expected.to_string());
             test_literal_expression(&Expression::Ident(ident), &expected).unwrap();
         }
@@ -774,17 +757,13 @@ fn test_call_expression_parsing() {
 
     let stmt = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
 
-    let stmt = &*stmt.expr.as_ref().unwrap().borrow();
-    let expr = cast_variant!(stmt, Expression::Call).unwrap();
+    let stmt = &*stmt.expr.as_ref().unwrap();
+    let expr = cast_variant!(&**stmt, Expression::Call).unwrap();
 
-    test_literal_expression(
-        &expr.arguments[0].as_ref().unwrap().borrow(),
-        &LiteralValue::Int(1),
-    )
-    .unwrap();
+    test_literal_expression(&expr.arguments[0].as_ref().unwrap(), &LiteralValue::Int(1)).unwrap();
 
     test_infix_expression(
-        &expr.arguments[1].as_ref().unwrap().borrow(),
+        &expr.arguments[1].as_ref().unwrap(),
         &LiteralValue::Int(2),
         "*",
         &LiteralValue::Int(3),
@@ -792,7 +771,7 @@ fn test_call_expression_parsing() {
     .unwrap();
 
     test_infix_expression(
-        &expr.arguments[2].as_ref().unwrap().borrow(),
+        &expr.arguments[2].as_ref().unwrap(),
         &LiteralValue::Int(4),
         "+",
         &LiteralValue::Int(5),

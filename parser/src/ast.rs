@@ -5,12 +5,11 @@
 //! Expression ::= [undefined]
 
 use lexer::token::Token;
-use std::{cell::RefCell, rc::Rc};
 
-type ChildNode<T> = Rc<RefCell<T>>;
+type ChildNode<T> = Box<T>;
 // TODO: I could possibly turn ExpectedChild into a Result<Rc<RefCell<T>>, ParserError>
 // This give would meaning to the otherwise elusive Option<_>
-type ExpectedChild<T> = Option<Rc<RefCell<T>>>;
+type ExpectedChild<T> = Option<ChildNode<T>>;
 
 #[derive(Debug)]
 pub enum Node {
@@ -109,18 +108,18 @@ pub struct InfixExpression {
 pub struct IfExpression {
     pub token: Token,
     pub condition: ExpectedChild<Expression>,
-    pub consequence: ChildNode<BlockStatement>,
+    pub consequence: BlockStatement,
     /// The first Option indicates whether a follow-up else clause was given.
     ///
     /// The second Option shows if there is an error while parsing the else block.
-    pub alternative: Option<ExpectedChild<BlockStatement>>,
+    pub alternative: Option<Option<BlockStatement>>,
 }
 
 #[derive(Debug)]
 pub struct FunctionLiteral {
     pub token: Token,
-    pub parameters: Option<Vec<ChildNode<Identifier>>>,
-    pub body: ChildNode<BlockStatement>,
+    pub parameters: Option<Vec<Identifier>>,
+    pub body: BlockStatement,
 }
 
 #[derive(Debug)]
@@ -195,9 +194,9 @@ pub mod representation {
                 self.token.literal,
                 self.name
                     .as_ref()
-                    .and_then(|name| Some(name.as_ref().borrow().string_repr()))
+                    .and_then(|name| Some(name.as_ref().string_repr()))
                     .unwrap_or_else(|| "<None>".to_string()),
-                self.value.as_ref().unwrap().borrow().string_repr()
+                self.value.as_ref().unwrap().string_repr()
             )
         }
     }
@@ -210,7 +209,7 @@ pub mod representation {
 
     impl StringRepr for ExpressionStatement {
         fn string_repr(&self) -> String {
-            self.expr.as_ref().unwrap().borrow().string_repr()
+            self.expr.as_ref().unwrap().string_repr()
         }
     }
 
@@ -218,7 +217,7 @@ pub mod representation {
         fn string_repr(&self) -> String {
             self.statements
                 .iter()
-                .map(|stmt| stmt.borrow().string_repr())
+                .map(|stmt| stmt.string_repr())
                 .collect::<Vec<_>>()
                 .join("")
         }
@@ -247,7 +246,7 @@ pub mod representation {
             format!(
                 "({}{})",
                 self.operator.literal,
-                self.operand.as_ref().unwrap().borrow().string_repr()
+                self.operand.as_ref().unwrap().string_repr()
             )
         }
     }
@@ -256,9 +255,9 @@ pub mod representation {
         fn string_repr(&self) -> String {
             format!(
                 "({} {} {})",
-                self.left_expr.borrow().string_repr(),
+                self.left_expr.string_repr(),
                 self.operator.literal,
-                self.right_expr.as_ref().unwrap().borrow().string_repr(),
+                self.right_expr.as_ref().unwrap().string_repr(),
             )
         }
     }
@@ -266,13 +265,13 @@ pub mod representation {
     impl StringRepr for IfExpression {
         fn string_repr(&self) -> String {
             let mut repr = self.token.literal.to_string();
-            repr.push_str(&self.condition.as_ref().unwrap().borrow().string_repr());
+            repr.push_str(&self.condition.as_ref().unwrap().string_repr());
             repr.push(' ');
-            repr.push_str(&self.consequence.borrow().string_repr());
+            repr.push_str(&self.consequence.string_repr());
 
             if let Some(block) = &self.alternative {
                 repr.push_str(" else ");
-                repr.push_str(&block.as_ref().unwrap().borrow().string_repr());
+                repr.push_str(&block.as_ref().unwrap().string_repr());
             }
 
             repr
@@ -284,14 +283,14 @@ pub mod representation {
             let params = self.parameters.as_ref().map(|params| {
                 params
                     .iter()
-                    .map(|param| param.borrow().string_repr())
+                    .map(|param| param.string_repr())
                     .collect::<Vec<_>>()
                     .join(", ")
             });
             format!(
                 "fn({}){}",
                 params.unwrap_or_else(|| "[parsing error in parameters]".to_string()),
-                self.body.borrow().string_repr()
+                self.body.string_repr()
             )
         }
     }
@@ -304,12 +303,12 @@ pub mod representation {
                 .map(|maybe_arg| {
                     maybe_arg
                         .as_ref()
-                        .map(|arg| arg.borrow().string_repr())
+                        .map(|arg| arg.string_repr())
                         .unwrap_or_else(|| "[parsing error in argument]".to_string())
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            format!("{}({})", self.function.borrow().string_repr(), args)
+            format!("{}({})", self.function.string_repr(), args)
         }
     }
 }
