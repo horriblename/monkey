@@ -1,11 +1,28 @@
 use crate::{error::EResult, object};
 use lexer::lexer::Lexer;
-use parser::{ast, parse::Parser};
+use parser::{
+    ast::{self, representation::StringRepr},
+    parse::Parser,
+};
 
 // TODO: extract these into a top-level util crate, this is also used by parser tests
 type TResult<T> = Result<T, TError>;
 #[derive(Debug)]
 struct TError(String);
+
+macro_rules! cast_variant {
+    ($target: expr, $pat: path) => {{
+        if let $pat(a) = $target {
+            Ok(a)
+        } else {
+            Err(TError(format!(
+                "mismatch variant when casting into {} from {:?}",
+                stringify!($pat),
+                $target,
+            )))
+        }
+    }};
+}
 
 macro_rules! check_eq {
     ($left: expr, $right: expr) => {{
@@ -60,9 +77,9 @@ fn test_eval(input: &str) -> EResult<object::ObjectRc> {
     let lexer = Lexer::new(input.to_string());
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();
-    let mut env = object::Environment::new();
+    let mut env = object::EnvStack::new();
 
-    return super::eval(&ast::Node::Prog(program), &mut env);
+    return super::eval(ast::Node::Prog(program), &mut env);
 }
 
 fn test_integer_object(obj: &object::Object, expected: i64) -> TResult<()> {
@@ -419,5 +436,60 @@ fn test_let_statement() {
         let obj = &test_eval(test.input).unwrap();
         // let var = cast_variant!(obj, object::Object::Variable).unwrap();
         test_integer_object(&obj.borrow(), test.expected).unwrap();
+    }
+}
+
+#[test]
+fn test_function_object() {
+    let input = "fn(x) {x + 2;};";
+    let evaluated = test_eval(input).unwrap();
+    let evaluated = evaluated.borrow();
+    let func = cast_variant!(&*evaluated, object::Object::Function).unwrap();
+
+    assert_eq!(1, func.parameters.len());
+    assert_eq!("x", func.parameters[0].string_repr());
+
+    let expected_body = "(x + 2)";
+
+    assert_eq!(expected_body, func.body.string_repr());
+}
+
+#[test]
+fn test_function_application() {
+    struct Test {
+        input: &'static str,
+        expected: i64,
+    }
+
+    let tests = vec![
+        Test {
+            input: "let identity = fn(x) { x; }; identity(5);",
+            expected: 5,
+        },
+        Test {
+            input: "let identity = fn(x) { return x; }; identity(5);",
+            expected: 5,
+        },
+        Test {
+            input: "let double = fn(x) { x * 2; }; double(5);",
+            expected: 10,
+        },
+        Test {
+            input: "let add = fn(x, y) { x + y; }; add(5, 5);",
+            expected: 10,
+        },
+        Test {
+            input: "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
+            expected: 20,
+        },
+        Test {
+            input: "fn(x) { x; }(5)",
+            expected: 5,
+        },
+    ];
+
+    for test in tests {
+        let evaluated = test_eval(test.input).unwrap();
+        test_integer_object(&evaluated.borrow(), test.expected).unwrap();
     }
 }

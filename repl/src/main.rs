@@ -20,7 +20,7 @@ fn print_parse_errors(errors: &Vec<parse::ParseError>) {
 
 fn main() {
     println!("Welcome to the Monkey programming language!");
-    let mut env = evaluator::object::Environment::new();
+    let mut env = evaluator::object::EnvStack::new();
 
     loop {
         print!("{}", PROMPT);
@@ -46,7 +46,8 @@ fn main() {
             print_parse_errors(parse_errors);
             continue;
         }
-        let evaluated = evaluator::eval::eval(&ast::Node::Prog(program), &mut env);
+
+        let evaluated = evaluator::eval::eval(ast::Node::Prog(program), &mut env);
         match &evaluated {
             Err(err) => eprintln!("Error: {:?}", err),
             Ok(evaluated) => println!("{}", evaluated.borrow().inspect()),

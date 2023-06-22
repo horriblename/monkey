@@ -127,7 +127,11 @@ impl Parser {
                 if self.curr_token_is(TokenType::Semicolon) {
                     self.next_token();
                 } else {
-                    todo!("unrecoverable parsing error");
+                    let tok = self.next_token();
+                    self.errors.push(ParseError(format!(
+                        "Unexpected token: {}, skipping token",
+                        tok.literal
+                    )))
                 }
             }
         }

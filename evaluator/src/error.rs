@@ -8,6 +8,7 @@ pub enum EvalError {
     UnknownPrefixOp(UnknownPrefixOperator),
     InfixOpErr(InfixOpError),
     UnknownIdent(UnknownIdentifier),
+    NotAFunction(NotAFunction),
 }
 
 impl Display for EvalError {
@@ -16,6 +17,7 @@ impl Display for EvalError {
             Self::UnknownPrefixOp(variant) => Display::fmt(variant, f),
             Self::InfixOpErr(variant) => Display::fmt(variant, f),
             Self::UnknownIdent(variant) => Display::fmt(variant, f),
+            Self::NotAFunction(variant) => Display::fmt(variant, f),
         }
     }
 }
@@ -93,6 +95,23 @@ impl Debug for UnknownIdentifier {
 }
 
 impl Display for UnknownIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(self, f)
+    }
+}
+
+pub struct NotAFunction {
+    // FIXME: this should be an Object but I cba anymore
+    pub obj: object::ObjectType,
+}
+
+impl Debug for NotAFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "not a function: {:?}", self.obj)
+    }
+}
+
+impl Display for NotAFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(self, f)
     }

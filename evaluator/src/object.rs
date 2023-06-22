@@ -1,3 +1,4 @@
+use parser::ast::{self, representation::StringRepr};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, PartialEq)]
@@ -6,6 +7,7 @@ pub enum ObjectType {
     Boolean,
     Null,
     ReturnValue,
+    Function,
 }
 
 // In the book, Object is used as an interface:
@@ -25,6 +27,7 @@ pub enum Object {
     Bool(bool),
     Null,
     ReturnValue(ObjectRc),
+    Function(Function),
 }
 
 pub type ObjectRc = Rc<RefCell<Object>>;
@@ -36,6 +39,16 @@ impl Object {
             Self::Bool(val) => format!("{}", val),
             Self::Null => "null".to_string(),
             Self::ReturnValue(val) => val.borrow().inspect(),
+            Self::Function(val) => {
+                let params = val
+                    .parameters
+                    .iter()
+                    .map(|ident| ident.string_repr())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                format!("fn({}) {{\n{}}}", params, val.body.string_repr())
+            }
         }
     }
 
@@ -46,6 +59,7 @@ impl Object {
             Self::Bool(_) => ObjectType::Boolean,
             Self::Null => ObjectType::Null,
             Self::ReturnValue(_) => ObjectType::ReturnValue,
+            Self::Function(_) => ObjectType::Function,
         }
     }
 }
@@ -62,8 +76,30 @@ impl PartialEq for Object {
     }
 }
 
+// #[derive(Debug)]
+// pub struct Function<'obj, 'ast: 'obj> {
+//     pub parameters: Vec<ast::Identifier>,
+//     pub body: &'ast ast::BlockStatement,
+//     pub env: &'obj RefCell<Environment<'ast>>,
+// }
+
+#[derive(Debug)]
+pub struct Function {
+    pub parameters: Vec<ast::Identifier>,
+    pub body: ast::BlockStatement,
+    // TODO: remove Option
+    pub env: Environment,
+}
+
+#[derive(Debug, Clone)]
 pub struct Environment {
     store: HashMap<String, Rc<RefCell<Object>>>,
+}
+
+// #[derive(Debug, Clone)]
+// TODO: enforce rule of always having at least one Environment on stack
+pub struct EnvStack {
+    stack: Vec<Environment>,
 }
 
 impl Environment {
@@ -73,6 +109,11 @@ impl Environment {
         }
     }
 
+    // I'm debating removing this function
+    pub fn new_enclosed_environment(outer: &Self) -> Self {
+        outer.clone()
+    }
+
     pub fn get(&self, name: &str) -> Option<Rc<RefCell<Object>>> {
         self.store.get(name).map(|var| var.clone())
     }
@@ -80,5 +121,38 @@ impl Environment {
     pub fn set(&mut self, name: String, val: Rc<RefCell<Object>>) -> Rc<RefCell<Object>> {
         self.store.insert(name, val.clone());
         val
+    }
+}
+
+impl EnvStack {
+    pub fn new() -> Self {
+        EnvStack {
+            stack: vec![Environment::new()],
+        }
+    }
+
+    pub fn new_enclosed_environment(&mut self) -> &mut Self {
+        self.stack.push(Environment::new());
+        self
+    }
+
+    pub fn pop(&mut self) -> Environment {
+        debug_assert!(self.stack.len() >= 2);
+        self.stack.pop().expect("empty EnvStack!")
+    }
+
+    pub fn get(&self, name: &str) -> Option<Rc<RefCell<Object>>> {
+        self.stack.iter().rev().find_map(|env| env.get(name))
+    }
+
+    pub fn set(&mut self, name: String, val: Rc<RefCell<Object>>) -> Rc<RefCell<Object>> {
+        self.stack
+            .last_mut()
+            .expect("empty EnvStack!")
+            .set(name, val)
+    }
+
+    pub fn peek(&self) -> &Environment {
+        self.stack.last().expect("empty EnvStack!")
     }
 }

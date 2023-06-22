@@ -18,7 +18,7 @@ pub enum Node {
     Expr(Expression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -26,7 +26,7 @@ pub enum Statement {
     Block(BlockStatement),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Ident(Identifier),
     Int(IntegerLiteral),
@@ -38,12 +38,12 @@ pub enum Expression {
     Call(CallExpression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LetStatement {
     pub token: Token,
 
@@ -62,49 +62,49 @@ pub struct Identifier {
     pub value: String, // isn't this the same as `Token.literal`??
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: i64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BooleanLiteral {
     pub token: Token,
     pub value: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ReturnStatement {
     pub token: Token,
     pub expr: ExpectedChild<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExpressionStatement {
     pub expr: ExpectedChild<Expression>,
 }
 
 // { statement; ... }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BlockStatement {
     pub statements: Vec<ChildNode<Statement>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PrefixExpression {
     pub operator: Token,
     pub operand: ExpectedChild<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InfixExpression {
     pub left_expr: ChildNode<Expression>,
     pub operator: Token,
     pub right_expr: ExpectedChild<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: ExpectedChild<Expression>,
@@ -115,14 +115,14 @@ pub struct IfExpression {
     pub alternative: Option<Option<BlockStatement>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Option<Vec<Identifier>>,
     pub body: BlockStatement,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CallExpression {
     pub token: Token, // '('
     pub function: ChildNode<Expression>,
