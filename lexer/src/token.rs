@@ -27,6 +27,7 @@ pub enum TokenType {
     Return,
     True,
     False,
+    String,
 
     // Operators,
     Assign,

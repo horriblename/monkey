@@ -5,6 +5,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 pub enum ObjectType {
     Integer,
     Boolean,
+    String,
     Null,
     ReturnValue,
     Function,
@@ -25,6 +26,7 @@ pub enum ObjectType {
 pub enum Object {
     Int(i64),
     Bool(bool),
+    String(String),
     Null,
     ReturnValue(ObjectRc),
     Function(Function),
@@ -37,6 +39,7 @@ impl Object {
         match self {
             Self::Int(val) => format!("{}", val),
             Self::Bool(val) => format!("{}", val),
+            Self::String(s) => s.clone(),
             Self::Null => "null".to_string(),
             Self::ReturnValue(val) => val.borrow().inspect(),
             Self::Function(val) => {
@@ -57,6 +60,7 @@ impl Object {
         match self {
             Self::Int(_) => ObjectType::Integer,
             Self::Bool(_) => ObjectType::Boolean,
+            Self::String(_) => ObjectType::String,
             Self::Null => ObjectType::Null,
             Self::ReturnValue(_) => ObjectType::ReturnValue,
             Self::Function(_) => ObjectType::Function,
@@ -70,6 +74,7 @@ impl PartialEq for Object {
             (Self::Int(x), Self::Int(y)) => x == y,
             (Self::Bool(x), Self::Bool(y)) => x == y,
             (Self::Null, Self::Null) => true,
+            (Self::String(x), Self::String(y)) => x == y,
             (Self::ReturnValue(x), Self::ReturnValue(y)) => x == y,
             _ => false,
         }

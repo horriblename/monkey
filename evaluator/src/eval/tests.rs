@@ -155,6 +155,30 @@ fn test_boolean_object(obj: &object::Object, expected: bool) -> TResult<()> {
 }
 
 #[test]
+fn test_eval_string_expression() {
+    struct Test {
+        input: &'static str,
+        expected: &'static str,
+    }
+
+    let tests = vec![Test {
+        input: r#""Hello World!""#,
+        expected: "Hello World!",
+    }];
+
+    for test in tests {
+        let evaluated = test_eval(test.input).unwrap();
+        test_string_object(&evaluated.borrow(), test.expected).unwrap();
+    }
+}
+
+fn test_string_object(obj: &object::Object, expected: &str) -> TResult<()> {
+    let val = cast_variant!(obj, object::Object::String).unwrap();
+    check_eq!(val, expected)?;
+    Ok(())
+}
+
+#[test]
 fn test_bang_operator() {
     struct Test {
         input: &'static str,
@@ -394,6 +418,10 @@ fn test_error_handling() {
             input: "foobar",
             expected_msg: "identifier not found: foobar",
         },
+        Test {
+            input: r#""Hello" - "World""#,
+            expected_msg: "unknown operator: String - String",
+        },
     ];
 
     for test in tests {
@@ -492,4 +520,14 @@ fn test_function_application() {
         let evaluated = test_eval(test.input).unwrap();
         test_integer_object(&evaluated.borrow(), test.expected).unwrap();
     }
+}
+
+#[test]
+fn test_string_concatenation() {
+    let input = r#""Hello" + " " + "World!""#;
+
+    let evaluated = test_eval(input).unwrap();
+    let evaluated = &*evaluated.borrow();
+    let val = cast_variant!(evaluated, object::Object::String).unwrap();
+    assert_eq!(val, "Hello World!");
 }

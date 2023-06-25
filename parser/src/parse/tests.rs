@@ -601,6 +601,22 @@ fn test_boolean_literal_expression() {
 }
 
 #[test]
+fn test_string_literal_expression() {
+    let input = r#""hello world""#.to_string();
+    let lexer = Lexer::new(input);
+    let mut parser = Parser::new(lexer);
+
+    let mut program = parser.parse_program();
+    assert_eq!(1, program.statements.len());
+    check_parse_errors(&parser);
+
+    let stmt = program.statements.remove(0);
+    let expr = cast_variant!(stmt, Statement::Expr).unwrap().expr.unwrap();
+    let literal = cast_variant!(*expr, Expression::String).unwrap();
+    assert_eq!(literal.value, "hello world")
+}
+
+#[test]
 fn test_if_expression() {
     let input = "if (x < y) { x }";
     let lexer = Lexer::new(input.to_string());

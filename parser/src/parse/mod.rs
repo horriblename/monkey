@@ -260,6 +260,13 @@ impl Parser {
             TokenType::Ident => Some(ast::Expression::Ident(self.parse_identifier())),
             TokenType::Int => Some(ast::Expression::Int(self.parse_int())),
             TokenType::True | TokenType::False => Some(ast::Expression::Bool(self.parse_bool())),
+            TokenType::String => {
+                let token = self.next_token();
+                Some(ast::Expression::String(ast::StringLiteral {
+                    value: token.literal.clone(),
+                    token,
+                }))
+            }
             TokenType::If => self
                 .parse_if_expression()
                 .map(|expr| Expression::IfExpr(expr)),

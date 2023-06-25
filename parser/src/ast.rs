@@ -31,6 +31,7 @@ pub enum Expression {
     Ident(Identifier),
     Int(IntegerLiteral),
     Bool(BooleanLiteral),
+    String(StringLiteral),
     PrefixExpr(PrefixExpression),
     InfixExpr(InfixExpression),
     IfExpr(IfExpression),
@@ -72,6 +73,12 @@ pub struct IntegerLiteral {
 pub struct BooleanLiteral {
     pub token: Token,
     pub value: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct StringLiteral {
+    pub token: Token,
+    pub value: String,
 }
 
 #[derive(Debug, Clone)]
@@ -134,7 +141,7 @@ pub mod representation {
     use super::{
         BlockStatement, BooleanLiteral, CallExpression, Expression, ExpressionStatement,
         FunctionLiteral, Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement,
-        Node, PrefixExpression, Program, ReturnStatement, Statement,
+        Node, PrefixExpression, Program, ReturnStatement, Statement, StringLiteral,
     };
 
     pub trait StringRepr {
@@ -178,6 +185,7 @@ pub mod representation {
                 Self::Ident(ident) => ident.string_repr(),
                 Self::Int(integer) => integer.string_repr(),
                 Self::Bool(b) => b.string_repr(),
+                Self::String(s) => s.string_repr(),
                 Self::PrefixExpr(expr) => expr.string_repr(),
                 Self::InfixExpr(expr) => expr.string_repr(),
                 Self::IfExpr(expr) => expr.string_repr(),
@@ -203,7 +211,13 @@ pub mod representation {
 
     impl StringRepr for ReturnStatement {
         fn string_repr(&self) -> String {
-            todo!()
+            format!(
+                "return {}",
+                self.expr
+                    .as_ref()
+                    .map(|expr| expr.string_repr())
+                    .unwrap_or("<None>".to_string())
+            )
         }
     }
 
@@ -238,6 +252,12 @@ pub mod representation {
     impl StringRepr for BooleanLiteral {
         fn string_repr(&self) -> String {
             self.value.to_string()
+        }
+    }
+
+    impl StringRepr for StringLiteral {
+        fn string_repr(&self) -> String {
+            self.value.clone()
         }
     }
 

@@ -79,7 +79,9 @@ fn eval_statement(stmt: ast::Statement, env: &mut object::EnvStack) -> EResult<o
             );
             Ok(var)
         }
-        _ => todo!(),
+        ast::Statement::Block(_) => {
+            unreachable!("Parser has not supported arbitrary block statements")
+        }
     }
 }
 
@@ -88,6 +90,9 @@ fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult
         ast::Expression::Int(node) => Ok(Rc::new(RefCell::new(object::Object::Int(node.value)))),
         // TODO: return const TRUE/FALSE to reduce object creations
         ast::Expression::Bool(node) => Ok(Rc::new(RefCell::new(object::Object::Bool(node.value)))),
+        ast::Expression::String(node) => {
+            Ok(Rc::new(RefCell::new(object::Object::String(node.value))))
+        }
         ast::Expression::PrefixExpr(node) => {
             let right_ = node.operand.expect("Unchecked Parse Error!");
             let right = eval_expression(*right_, env)?;
@@ -184,11 +189,14 @@ fn eval_infix_expression(
         }));
     }
 
-    match operator {
+    match (left, operator, right) {
+        (object::Object::String(l), "+", object::Object::String(r)) => Ok(Rc::new(RefCell::new(
+            object::Object::String(format!("{}{}", l, r)),
+        ))),
         // NOTE: in the book pointer comparison is used to get slightly better performance. We can't do
         // that here tho
-        "==" => native_bool_to_boolean_object(left == right),
-        "!=" => native_bool_to_boolean_object(left != right),
+        (l, "==", r) => native_bool_to_boolean_object(l == r),
+        (l, "!=", r) => native_bool_to_boolean_object(l != r),
         _ => Err(EvalError::InfixOpErr(InfixOpError {
             error_type: InfixOpErrorType::UnknownOperator,
             left_type: left.type_(),

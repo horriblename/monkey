@@ -29,10 +29,12 @@ impl Lexer {
     }
 
     pub fn next_token(&mut self) -> Token {
-        let new_token = |token_type, ch: char| Token {
-            type_: token_type,
-            literal: ch.to_string(),
-        };
+        fn new_token(type_: TokenType, ch: char) -> Token {
+            Token {
+                type_,
+                literal: ch.to_string(),
+            }
+        }
 
         self.skip_whitespace();
 
@@ -49,6 +51,13 @@ impl Lexer {
             Some(b'{') => new_token(TokenType::LBrace, '{'),
             Some(b'}') => new_token(TokenType::RBrace, '}'),
             Some(b'/') => new_token(TokenType::Slash, '/'),
+            Some(b'"') => {
+                let literal = self.read_string();
+                Token {
+                    type_: TokenType::String,
+                    literal,
+                }
+            }
             Some(b'!') => {
                 if let Some(b'=') = self.peek_char() {
                     self.read_char();
@@ -163,6 +172,24 @@ impl Lexer {
 
         assert!(self.char.is_none() || !self.char.unwrap().is_ascii_whitespace());
     }
+
+    fn read_string(&mut self) -> String {
+        let position = self.position + 1;
+
+        self.read_char();
+
+        while self.char != Some(b'"') {
+            if self.char == None {
+                todo!("error handling: Unexpected EOF");
+            }
+            self.read_char();
+        }
+
+        self.read_char();
+
+        String::from_utf8(self.input[position as usize..(self.position - 1) as usize].to_vec())
+            .expect("TODO: error handling (string literal contains illegal bytes)")
+    }
 }
 
 #[cfg(test)]
@@ -172,7 +199,7 @@ mod tests {
     #[test]
     fn test_next_token() {
         use TokenType::*;
-        let input = "let five = 5;
+        let input = r#"let five = 5;
             let ten = 10;
 
             let add = fn(x, y) {
@@ -191,7 +218,9 @@ mod tests {
 
             10 == 10;
             10 != 9;
-            ";
+
+            let s = "A String Literal";
+            "#;
 
         struct Expected {
             tok_type: TokenType,
@@ -273,6 +302,10 @@ mod tests {
             expect(NotEqual, "!="),
             expect(Int, "9"),
             expect(Semicolon, ";"),
+            expect(Let, "let"),
+            expect(Ident, "s"),
+            expect(Assign, "="),
+            expect(String, r#"A String Literal"#),
             expect(EOF, ""),
         ];
 
