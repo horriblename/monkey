@@ -9,6 +9,14 @@ pub enum EvalError {
     InfixOpErr(InfixOpError),
     UnknownIdent(UnknownIdentifier),
     NotAFunction(NotAFunction),
+    WrongArgCount {
+        expected: usize,
+        got: usize,
+    },
+    MismatchArgumentType {
+        func_name: &'static str,
+        got: object::ObjectType,
+    },
 }
 
 impl Display for EvalError {
@@ -18,6 +26,18 @@ impl Display for EvalError {
             Self::InfixOpErr(variant) => Display::fmt(variant, f),
             Self::UnknownIdent(variant) => Display::fmt(variant, f),
             Self::NotAFunction(variant) => Display::fmt(variant, f),
+            Self::WrongArgCount { expected, got } => write!(
+                f,
+                "wrong number of arguments. got={}, want={}",
+                got, expected
+            ),
+            Self::MismatchArgumentType { func_name, got } => {
+                write!(
+                    f,
+                    "argument to `{}` not supported, got {:?}",
+                    func_name, got
+                )
+            }
         }
     }
 }

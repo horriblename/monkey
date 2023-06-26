@@ -107,16 +107,7 @@ fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult
             eval_infix_expression(&node.operator.literal, &left, &right)
         }
         ast::Expression::IfExpr(node) => eval_if_expression(node, env),
-        ast::Expression::Ident(ident) => {
-            // let env_borrow = env.borrow();
-            if let Some(var) = env.get(&ident.value) {
-                Ok(var)
-            } else {
-                Err(EvalError::UnknownIdent(UnknownIdentifier {
-                    name: ident.value.clone(),
-                }))
-            }
-        }
+        ast::Expression::Ident(ident) => eval_identifier(ident, env),
         ast::Expression::Fn(func) => {
             let parameters = func
                 .parameters
@@ -267,6 +258,23 @@ fn is_truthy(condition: &object::Object) -> bool {
     }
 }
 
+fn eval_identifier(
+    ident: ast::Identifier,
+    env: &mut object::EnvStack,
+) -> EResult<object::ObjectRc> {
+    if let Some(func) = object::get_builtin(&ident.value) {
+        return Ok(Rc::new(RefCell::new(object::Object::BuiltinFunc(func))));
+    }
+
+    if let Some(var) = env.get(&ident.value) {
+        Ok(var)
+    } else {
+        Err(EvalError::UnknownIdent(UnknownIdentifier {
+            name: ident.value.clone(),
+        }))
+    }
+}
+
 fn eval_call_expression(
     node: ast::CallExpression,
     env: &mut object::EnvStack,
@@ -305,6 +313,7 @@ fn apply_function(
     env: &mut object::EnvStack,
 ) -> EResult<object::ObjectRc> {
     match &*func.borrow() {
+        object::Object::BuiltinFunc(func) => Ok(Rc::new(RefCell::new(func.call(&args)?))),
         object::Object::Function(func) => {
             extend_function_env(func, args, env);
             let evaluated = eval_block_statement(func.body.clone(), env)?;

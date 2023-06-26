@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{error::EResult, object};
 use lexer::lexer::Lexer;
 use parser::{
@@ -530,4 +532,50 @@ fn test_string_concatenation() {
     let evaluated = &*evaluated.borrow();
     let val = cast_variant!(evaluated, object::Object::String).unwrap();
     assert_eq!(val, "Hello World!");
+}
+
+#[test]
+fn test_builtin_functions() {
+    #[derive(Debug)]
+    enum Expect {
+        Int(i64),
+        Err(&'static str),
+    }
+    struct Test {
+        input: &'static str,
+        expected: Expect,
+    }
+
+    let tests = vec![
+        Test {
+            input: r#"len("")"#,
+            expected: Expect::Int(0),
+        },
+        Test {
+            input: r#"len("four")"#,
+            expected: Expect::Int(4),
+        },
+        Test {
+            input: r#"len("hello world")"#,
+            expected: Expect::Int(11),
+        },
+        Test {
+            input: r#"len(1)"#,
+            expected: Expect::Err("argument to `len` not supported, got Integer"),
+        },
+        Test {
+            input: r#"len("one", "two")"#,
+            expected: Expect::Err("wrong number of arguments. got=2, want=1"),
+        },
+    ];
+
+    for test in tests {
+        let evaluated = test_eval(test.input).map(|res| Rc::try_unwrap(res).unwrap().into_inner());
+
+        match (&evaluated, test.expected) {
+            (Err(err), Expect::Err(expected)) => assert_eq!(format!("{:?}", err), expected),
+            (Ok(object::Object::Int(res)), Expect::Int(expected)) => assert_eq!(res, &expected),
+            (res, expected) => panic!("expected {:?} got {:?}", expected, res),
+        }
+    }
 }
