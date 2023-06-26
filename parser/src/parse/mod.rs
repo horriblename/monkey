@@ -30,6 +30,7 @@ pub struct Parser {
 enum InfixType {
     Op(ast::InfixExpression),
     Call(ast::CallExpression),
+    Index(ast::IndexExpression),
     NotInfix(ast::Expression),
 }
 
@@ -236,6 +237,7 @@ impl Parser {
                     InfixType::NotInfix(expr) => return Some(expr),
                     InfixType::Call(expr) => ast::Expression::Call(expr),
                     InfixType::Op(infix) => ast::Expression::InfixExpr(infix),
+                    InfixType::Index(expr) => ast::Expression::Index(expr),
                 };
             }
 
@@ -336,6 +338,7 @@ impl Parser {
             | TokenType::Slash
             | TokenType::Asterisk => InfixType::Op(self.parse_infix_expression(left)),
             TokenType::LParen => InfixType::Call(self.parse_call_expression(left)),
+            TokenType::LBracket => InfixType::Index(self.parse_index_expression(left)),
             _ => InfixType::NotInfix(left),
         }
     }
@@ -355,7 +358,7 @@ impl Parser {
 
     fn parse_call_expression(&mut self, left: ast::Expression) -> ast::CallExpression {
         let token = self.next_token();
-        assert_eq!(token.type_, TokenType::LParen);
+        debug_assert_eq!(token.type_, TokenType::LParen);
 
         let args = self
             .parse_call_arguments()
@@ -367,6 +370,23 @@ impl Parser {
             token,
             function: Box::new(left),
             arguments: args,
+        }
+    }
+
+    fn parse_index_expression(&mut self, left: ast::Expression) -> ast::IndexExpression {
+        let token = self.next_token();
+        debug_assert_eq!(token.type_, TokenType::LBracket);
+
+        let index = self
+            .parse_expression(OperatorPrecedence::Lowest)
+            .map(Box::new);
+
+        self.expect_next(TokenType::RBracket);
+
+        ast::IndexExpression {
+            token,
+            left: Box::new(left),
+            index,
         }
     }
 
@@ -536,6 +556,7 @@ impl Parser {
     fn operator_precedence(token_type: &TokenType) -> OperatorPrecedence {
         match token_type {
             TokenType::LParen => OperatorPrecedence::Call,
+            TokenType::LBracket => OperatorPrecedence::Index,
             TokenType::Equal | TokenType::NotEqual => OperatorPrecedence::Equals,
             TokenType::LessThan | TokenType::GreaterThan => OperatorPrecedence::LessGreater,
             TokenType::Plus | TokenType::Minus => OperatorPrecedence::Sum,
@@ -568,6 +589,7 @@ enum OperatorPrecedence {
     Product = 4,     // *
     Prefix = 5,      // -X or !X
     Call = 6,        // myFunction(X)
+    Index = 7,       // array[index]
 }
 
 #[cfg(test)]

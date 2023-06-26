@@ -491,10 +491,18 @@ fn test_operator_precedence_parsing() {
             input: "add(a + b + c * d / f + g)",
             expected: "add((((a + b) + ((c * d) / f)) + g))",
         },
-        // Test {
-        //     input: "if (x < y) { x }",
-        //     expected: "(if )"
-        // }
+        Test {
+            input: "if (x < y) { x }",
+            expected: "if (x < y) { x }",
+        },
+        Test {
+            input: "a * [1, 2, 3, 4][b * c] * d",
+            expected: "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+        },
+        Test {
+            input: "add(a * b[2], b[1], 2 * [1, 2][1])",
+            expected: "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+        },
     ];
 
     for test in tests {
@@ -829,6 +837,32 @@ fn test_array_expression_parsing() {
         &LiteralValue::Int(3),
         "+",
         &LiteralValue::Int(3),
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_parsing_index_expressions() {
+    let input = "myArray[1 + 1]";
+    let lexer = Lexer::new(input.to_string());
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    dbg!(&program.statements);
+
+    assert_eq!(1, program.statements.len());
+
+    let stmt = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
+    let stmt = &*stmt.expr.as_ref().unwrap();
+    let index_expr = cast_variant!(&**stmt, Expression::Index).unwrap();
+
+    test_identifier(&index_expr.left, "myArray").unwrap();
+    test_infix_expression(
+        &*index_expr.index.as_ref().unwrap(),
+        &LiteralValue::Int(1),
+        "+",
+        &LiteralValue::Int(1),
     )
     .unwrap();
 }

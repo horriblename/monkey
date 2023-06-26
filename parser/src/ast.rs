@@ -38,6 +38,7 @@ pub enum Expression {
     IfExpr(IfExpression),
     Fn(FunctionLiteral),
     Call(CallExpression),
+    Index(IndexExpression),
 }
 
 #[derive(Debug, Clone)]
@@ -143,13 +144,20 @@ pub struct CallExpression {
     pub arguments: Vec<ExpectedChild<Expression>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct IndexExpression {
+    pub token: Token, // '['
+    pub left: ChildNode<Expression>,
+    pub index: ExpectedChild<Expression>,
+}
+
 pub mod representation {
 
     use super::{
         ArrayLiteral, BlockStatement, BooleanLiteral, CallExpression, Expression,
-        ExpressionStatement, FunctionLiteral, Identifier, IfExpression, InfixExpression,
-        IntegerLiteral, LetStatement, Node, PrefixExpression, Program, ReturnStatement, Statement,
-        StringLiteral,
+        ExpressionStatement, FunctionLiteral, Identifier, IfExpression, IndexExpression,
+        InfixExpression, IntegerLiteral, LetStatement, Node, PrefixExpression, Program,
+        ReturnStatement, Statement, StringLiteral,
     };
 
     pub trait StringRepr {
@@ -200,6 +208,7 @@ pub mod representation {
                 Self::IfExpr(expr) => expr.string_repr(),
                 Self::Fn(func) => func.string_repr(),
                 Self::Call(call) => call.string_repr(),
+                Self::Index(expr) => expr.string_repr(),
             }
         }
     }
@@ -238,11 +247,14 @@ pub mod representation {
 
     impl StringRepr for BlockStatement {
         fn string_repr(&self) -> String {
-            self.statements
-                .iter()
-                .map(|stmt| stmt.string_repr())
-                .collect::<Vec<_>>()
-                .join("")
+            "{ ".to_string()
+                + &self
+                    .statements
+                    .iter()
+                    .map(|stmt| stmt.string_repr())
+                    .collect::<Vec<_>>()
+                    .join("; \n")
+                + " }"
         }
     }
 
@@ -313,6 +325,7 @@ pub mod representation {
     impl StringRepr for IfExpression {
         fn string_repr(&self) -> String {
             let mut repr = self.token.literal.to_string();
+            repr.push(' ');
             repr.push_str(&self.condition.as_ref().unwrap().string_repr());
             repr.push(' ');
             repr.push_str(&self.consequence.string_repr());
@@ -357,6 +370,16 @@ pub mod representation {
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("{}({})", self.function.string_repr(), args)
+        }
+    }
+
+    impl StringRepr for IndexExpression {
+        fn string_repr(&self) -> String {
+            format!(
+                "({}[{}])",
+                self.left.string_repr(),
+                self.index.as_ref().unwrap().string_repr()
+            )
         }
     }
 }
