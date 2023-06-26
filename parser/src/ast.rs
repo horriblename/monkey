@@ -32,6 +32,7 @@ pub enum Expression {
     Int(IntegerLiteral),
     Bool(BooleanLiteral),
     String(StringLiteral),
+    Array(ArrayLiteral),
     PrefixExpr(PrefixExpression),
     InfixExpr(InfixExpression),
     IfExpr(IfExpression),
@@ -79,6 +80,12 @@ pub struct BooleanLiteral {
 pub struct StringLiteral {
     pub token: Token,
     pub value: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ArrayLiteral {
+    pub token: Token, // the '[' token
+    pub elements: Vec<Option<Expression>>,
 }
 
 #[derive(Debug, Clone)]
@@ -139,9 +146,10 @@ pub struct CallExpression {
 pub mod representation {
 
     use super::{
-        BlockStatement, BooleanLiteral, CallExpression, Expression, ExpressionStatement,
-        FunctionLiteral, Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement,
-        Node, PrefixExpression, Program, ReturnStatement, Statement, StringLiteral,
+        ArrayLiteral, BlockStatement, BooleanLiteral, CallExpression, Expression,
+        ExpressionStatement, FunctionLiteral, Identifier, IfExpression, InfixExpression,
+        IntegerLiteral, LetStatement, Node, PrefixExpression, Program, ReturnStatement, Statement,
+        StringLiteral,
     };
 
     pub trait StringRepr {
@@ -186,6 +194,7 @@ pub mod representation {
                 Self::Int(integer) => integer.string_repr(),
                 Self::Bool(b) => b.string_repr(),
                 Self::String(s) => s.string_repr(),
+                Self::Array(a) => a.string_repr(),
                 Self::PrefixExpr(expr) => expr.string_repr(),
                 Self::InfixExpr(expr) => expr.string_repr(),
                 Self::IfExpr(expr) => expr.string_repr(),
@@ -258,6 +267,25 @@ pub mod representation {
     impl StringRepr for StringLiteral {
         fn string_repr(&self) -> String {
             self.value.clone()
+        }
+    }
+
+    impl StringRepr for ArrayLiteral {
+        fn string_repr(&self) -> String {
+            let mut s = "[".to_string();
+
+            if let Some(el) = self.elements.get(0) {
+                s.push_str(&el.as_ref().unwrap().string_repr());
+            }
+
+            for el in &self.elements[1..] {
+                s.push_str(", ");
+                s.push_str(&el.as_ref().unwrap().string_repr());
+            }
+
+            s.push(']');
+
+            s
         }
     }
 

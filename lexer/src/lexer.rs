@@ -50,6 +50,8 @@ impl Lexer {
             Some(b'>') => new_token(TokenType::GreaterThan, '>'),
             Some(b'{') => new_token(TokenType::LBrace, '{'),
             Some(b'}') => new_token(TokenType::RBrace, '}'),
+            Some(b'[') => new_token(TokenType::LBracket, '['),
+            Some(b']') => new_token(TokenType::RBracket, ']'),
             Some(b'/') => new_token(TokenType::Slash, '/'),
             Some(b'"') => {
                 let literal = self.read_string();
@@ -218,6 +220,7 @@ mod tests {
             10 != 9;
 
             let s = "A String Literal";
+            [1, 2];
             "#;
 
         struct Expected {
@@ -304,6 +307,12 @@ mod tests {
             expect(Ident, "s"),
             expect(Assign, "="),
             expect(String, r#"A String Literal"#),
+            expect(Semicolon, ";"),
+            expect(LBracket, "["),
+            expect(Int, "1"),
+            expect(Comma, ","),
+            expect(Int, "2"),
+            expect(RBracket, "]"),
             expect(Semicolon, ";"),
             expect(EOF, ""),
         ];

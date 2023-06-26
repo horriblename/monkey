@@ -794,3 +794,41 @@ fn test_call_expression_parsing() {
     )
     .unwrap();
 }
+
+#[test]
+fn test_array_expression_parsing() {
+    let input = "[1, 2 * 2, 3 + 3]";
+    let lexer = Lexer::new(input.to_string());
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    assert_eq!(1, program.statements.len());
+
+    let stmt = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
+
+    let stmt = &*stmt.expr.as_ref().unwrap();
+    let arr_expr = cast_variant!(&**stmt, Expression::Array).unwrap();
+
+    test_literal_expression(
+        &arr_expr.elements[0].as_ref().unwrap(),
+        &LiteralValue::Int(1),
+    )
+    .unwrap();
+
+    test_infix_expression(
+        &arr_expr.elements[1].as_ref().unwrap(),
+        &LiteralValue::Int(2),
+        "*",
+        &LiteralValue::Int(2),
+    )
+    .unwrap();
+
+    test_infix_expression(
+        &arr_expr.elements[2].as_ref().unwrap(),
+        &LiteralValue::Int(3),
+        "+",
+        &LiteralValue::Int(3),
+    )
+    .unwrap();
+}

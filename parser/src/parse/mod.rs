@@ -257,6 +257,7 @@ impl Parser {
                 Some(ast::Expression::PrefixExpr(self.parse_prefix_expression()))
             }
             TokenType::LParen => self.parse_grouped_expression(),
+            TokenType::LBracket => self.parse_array_literal().map(ast::Expression::Array),
             TokenType::Ident => Some(ast::Expression::Ident(self.parse_identifier())),
             TokenType::Int => Some(ast::Expression::Int(self.parse_int())),
             TokenType::True | TokenType::False => Some(ast::Expression::Bool(self.parse_bool())),
@@ -277,6 +278,15 @@ impl Parser {
         }
     }
 
+    fn parse_prefix_expression(&mut self) -> ast::PrefixExpression {
+        let operator = self.next_token();
+        let operand = self
+            .parse_expression(OperatorPrecedence::Prefix)
+            .map(|expr| Box::new(expr));
+
+        ast::PrefixExpression { operator, operand }
+    }
+
     // Parenthesised expressions `(5 + 5)`
     fn parse_grouped_expression(&mut self) -> Option<ast::Expression> {
         self.next_token();
@@ -286,13 +296,31 @@ impl Parser {
         expr
     }
 
-    fn parse_prefix_expression(&mut self) -> ast::PrefixExpression {
-        let operator = self.next_token();
-        let operand = self
-            .parse_expression(OperatorPrecedence::Prefix)
-            .map(|expr| Box::new(expr));
+    fn parse_array_literal(&mut self) -> Option<ast::ArrayLiteral> {
+        let token = self.next_token();
+        let elements = self.parse_expression_list(TokenType::RBracket)?;
 
-        ast::PrefixExpression { operator, operand }
+        Some(ast::ArrayLiteral { token, elements })
+    }
+
+    fn parse_expression_list(&mut self, end: TokenType) -> Option<Vec<Option<ast::Expression>>> {
+        let mut elements = vec![];
+
+        if self.curr_token_is(end) {
+            self.next_token();
+            return Some(elements);
+        }
+
+        elements.push(self.parse_expression(OperatorPrecedence::Lowest));
+
+        while self.curr_token_is(TokenType::Comma) {
+            self.next_token();
+            elements.push(self.parse_expression(OperatorPrecedence::Lowest))
+        }
+
+        self.expect_next(TokenType::RBracket)?;
+
+        Some(elements)
     }
 
     // replaces `Parser.prefixParseFns` in the book
