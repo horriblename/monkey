@@ -185,9 +185,7 @@ impl Lexer {
             self.read_char();
         }
 
-        self.read_char();
-
-        String::from_utf8(self.input[position as usize..(self.position - 1) as usize].to_vec())
+        String::from_utf8(self.input[position as usize..(self.position) as usize].to_vec())
             .expect("TODO: error handling (string literal contains illegal bytes)")
     }
 }
@@ -306,6 +304,7 @@ mod tests {
             expect(Ident, "s"),
             expect(Assign, "="),
             expect(String, r#"A String Literal"#),
+            expect(Semicolon, ";"),
             expect(EOF, ""),
         ];
 
