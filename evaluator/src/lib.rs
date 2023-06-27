@@ -4,6 +4,7 @@
 
 pub mod eval;
 
+pub mod builtins;
 /// # Foundation of our Object System
 ///
 /// We're going to represent every value we encounter when evealuating source code as an `Object`,

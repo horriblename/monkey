@@ -563,12 +563,16 @@ fn test_builtin_functions() {
             expected: Expect::Int(11),
         },
         Test {
-            input: r#"len(1)"#,
+            input: "len(1)",
             expected: Expect::Err("argument to `len` not supported, got Integer"),
         },
         Test {
             input: r#"len("one", "two")"#,
             expected: Expect::Err("wrong number of arguments. got=2, want=1"),
+        },
+        Test {
+            input: "len([1, 2, 3])",
+            expected: Expect::Int(3),
         },
     ];
 

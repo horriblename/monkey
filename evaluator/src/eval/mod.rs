@@ -276,7 +276,7 @@ fn eval_identifier(
     ident: ast::Identifier,
     env: &mut object::EnvStack,
 ) -> EResult<object::ObjectRc> {
-    if let Some(func) = object::get_builtin(&ident.value) {
+    if let Some(func) = object::Builtin::from_func_name(&ident.value) {
         return Ok(Rc::new(RefCell::new(object::Object::BuiltinFunc(func))));
     }
 

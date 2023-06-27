@@ -1,7 +1,7 @@
 use parser::ast::{self, representation::StringRepr};
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
 
-use crate::error::EResult;
+use crate::{builtins, error::EResult};
 
 #[derive(Debug, PartialEq)]
 pub enum ObjectType {
@@ -113,22 +113,13 @@ pub struct Function {
     pub env: Environment,
 }
 
-pub type BuiltinFuncSignature = dyn Fn(&Vec<ObjectRc>) -> EResult<Object>;
-
-pub fn get_builtin(name: &str) -> Option<Builtin> {
-    match name {
-        "len" => Some(Builtin::new(&builtins::len)),
-        _ => None,
-    }
-}
-
 pub struct Builtin {
-    func: &'static BuiltinFuncSignature,
+    func: &'static builtins::BuiltinFuncSignature,
 }
 
 impl Builtin {
-    pub fn new(func: &'static BuiltinFuncSignature) -> Self {
-        Self { func }
+    pub fn from_func_name(name: &str) -> Option<Builtin> {
+        builtins::get_builtin(name).map(|func| Builtin { func })
     }
 
     pub fn call(&self, args: &Vec<ObjectRc>) -> EResult<Object> {
@@ -151,28 +142,6 @@ pub struct Environment {
 // TODO: enforce rule of always having at least one Environment on stack
 pub struct EnvStack {
     stack: Vec<Environment>,
-}
-
-mod builtins {
-    use crate::error::{EResult, EvalError};
-
-    pub fn len(args: &Vec<super::ObjectRc>) -> EResult<super::Object> {
-        // TODO: error handling
-        if args.len() != 1 {
-            return Err(EvalError::WrongArgCount {
-                expected: 1,
-                got: args.len(),
-            });
-        }
-
-        match &*args[0].borrow() {
-            super::Object::String(s) => Ok(super::Object::Int(s.len() as i64)),
-            obj => Err(EvalError::MismatchArgumentType {
-                func_name: "len",
-                got: obj.type_(),
-            }),
-        }
-    }
 }
 
 impl Environment {
