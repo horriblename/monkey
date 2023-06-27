@@ -479,7 +479,8 @@ fn test_function_object() {
     assert_eq!(1, func.parameters.len());
     assert_eq!("x", func.parameters[0].string_repr());
 
-    let expected_body = "(x + 2)";
+    // pretty sure in the book it's just (x + 2)
+    let expected_body = "{ (x + 2) }";
 
     assert_eq!(expected_body, func.body.string_repr());
 }

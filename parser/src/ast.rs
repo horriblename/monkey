@@ -253,7 +253,7 @@ pub mod representation {
                     .iter()
                     .map(|stmt| stmt.string_repr())
                     .collect::<Vec<_>>()
-                    .join("; \n")
+                    .join(" ")
                 + " }"
         }
     }
@@ -349,7 +349,7 @@ pub mod representation {
                     .join(", ")
             });
             format!(
-                "fn({}){}",
+                "fn({}){{{}}}",
                 params.unwrap_or_else(|| "[parsing error in parameters]".to_string()),
                 self.body.string_repr()
             )

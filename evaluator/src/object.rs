@@ -54,7 +54,7 @@ impl Object {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                format!("fn({}) {{\n{}\n}}", params, val.body.string_repr())
+                format!("fn({}) {}", params, val.body.string_repr())
             }
             Self::BuiltinFunc(_) => "builtin function".to_string(),
         }
