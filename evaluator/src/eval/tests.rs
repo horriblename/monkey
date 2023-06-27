@@ -85,9 +85,11 @@ fn test_eval(input: &str) -> EResult<object::ObjectRc> {
 }
 
 fn test_integer_object(obj: &object::Object, expected: i64) -> TResult<()> {
-    check_eq!(&object::Object::Int(expected), obj)?;
+    check_eq!(&object::Object::Int(expected), obj)
+}
 
-    Ok(())
+fn test_null_object(obj: &object::Object) -> TResult<()> {
+    check_eq!(&object::Object::Null, obj)
 }
 
 #[test]
@@ -577,6 +579,66 @@ fn test_builtin_functions() {
             (Err(err), Expect::Err(expected)) => assert_eq!(format!("{:?}", err), expected),
             (Ok(object::Object::Int(res)), Expect::Int(expected)) => assert_eq!(res, &expected),
             (res, expected) => panic!("expected {:?} got {:?}", expected, res),
+        }
+    }
+}
+
+#[test]
+fn test_array_index_expression() {
+    struct Test {
+        input: &'static str,
+        expected: Option<i64>,
+    }
+    let tests = vec![
+        Test {
+            input: "[1, 2, 3][0]",
+            expected: Some(1),
+        },
+        Test {
+            input: "[1, 2, 3][1]",
+            expected: Some(2),
+        },
+        Test {
+            input: "[1, 2, 3][2]",
+            expected: Some(3),
+        },
+        Test {
+            input: "let i = 0; [1][i];",
+            expected: Some(1),
+        },
+        Test {
+            input: "[1, 2, 3][1 + 1];",
+            expected: Some(3),
+        },
+        Test {
+            input: "let myArray = [1, 2, 3]; myArray[2];",
+            expected: Some(3),
+        },
+        Test {
+            input: "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+            expected: Some(6),
+        },
+        Test {
+            input: "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+            expected: Some(2),
+        },
+        Test {
+            input: "[1, 2, 3][3]",
+            expected: None,
+        },
+        Test {
+            input: "[1, 2, 3][-1]",
+            expected: None,
+        },
+    ];
+
+    for test in tests {
+        let evaluated = test_eval(test.input).unwrap();
+        let evaluated = &*evaluated.borrow();
+        if let Some(expected) = test.expected {
+            test_integer_object(evaluated, expected).unwrap();
+        } else {
+            test_null_object(evaluated).unwrap();
         }
     }
 }

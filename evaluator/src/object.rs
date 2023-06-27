@@ -9,6 +9,7 @@ pub enum ObjectType {
     Boolean,
     String,
     Null,
+    Array,
     ReturnValue,
     Function,
     BuiltinFunc,
@@ -31,6 +32,7 @@ pub enum Object {
     Bool(bool),
     String(String),
     Null,
+    Array(Array),
     ReturnValue(ObjectRc),
     Function(Function),
     BuiltinFunc(Builtin),
@@ -45,6 +47,16 @@ impl Object {
             Self::Bool(val) => format!("{}", val),
             Self::String(s) => s.clone(),
             Self::Null => "null".to_string(),
+            Self::Array(arr) => {
+                let elements = arr
+                    .elements
+                    .iter()
+                    .map(|el| el.borrow().inspect())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                format!("[{}]", elements)
+            }
             Self::ReturnValue(val) => val.borrow().inspect(),
             Self::Function(val) => {
                 let params = val
@@ -67,6 +79,7 @@ impl Object {
             Self::Bool(_) => ObjectType::Boolean,
             Self::String(_) => ObjectType::String,
             Self::Null => ObjectType::Null,
+            Self::Array(_) => ObjectType::Array,
             Self::ReturnValue(_) => ObjectType::ReturnValue,
             Self::Function(_) => ObjectType::Function,
             Self::BuiltinFunc(_) => ObjectType::BuiltinFunc,
@@ -87,12 +100,10 @@ impl PartialEq for Object {
     }
 }
 
-// #[derive(Debug)]
-// pub struct Function<'obj, 'ast: 'obj> {
-//     pub parameters: Vec<ast::Identifier>,
-//     pub body: &'ast ast::BlockStatement,
-//     pub env: &'obj RefCell<Environment<'ast>>,
-// }
+#[derive(Debug)]
+pub struct Array {
+    pub elements: Vec<ObjectRc>,
+}
 
 #[derive(Debug)]
 pub struct Function {

@@ -17,6 +17,10 @@ pub enum EvalError {
         func_name: &'static str,
         got: object::ObjectType,
     },
+    IndexOpWrongType {
+        left_type: object::ObjectType,
+        // index_type: object::ObjectType,
+    },
 }
 
 impl Display for EvalError {
@@ -37,6 +41,9 @@ impl Display for EvalError {
                     "argument to `{}` not supported, got {:?}",
                     func_name, got
                 )
+            }
+            Self::IndexOpWrongType { left_type } => {
+                write!(f, "index operator not supported: {:?}", left_type)
             }
         }
     }

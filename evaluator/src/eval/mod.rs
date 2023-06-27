@@ -93,6 +93,17 @@ fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult
         ast::Expression::String(node) => {
             Ok(Rc::new(RefCell::new(object::Object::String(node.value))))
         }
+        ast::Expression::Array(node) => {
+            let expressions = node
+                .elements
+                .into_iter()
+                .map(|expr| expr.expect("Unchecked Parse Error!"))
+                .collect::<Vec<_>>();
+            let elements = eval_expressions(expressions, env)?;
+            Ok(Rc::new(RefCell::new(object::Object::Array(
+                object::Array { elements },
+            ))))
+        }
         ast::Expression::PrefixExpr(node) => {
             let right_ = node.operand.expect("Unchecked Parse Error!");
             let right = eval_expression(*right_, env)?;
@@ -124,8 +135,11 @@ fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult
             ))))
         }
         ast::Expression::Call(node) => eval_call_expression(node, env),
+        ast::Expression::Index(node) => eval_index_expression(node, env),
     }
 }
+
+// fn eval_
 
 fn eval_prefix_expression(operator: &str, right: &object::Object) -> EResult<object::ObjectRc> {
     match operator {
@@ -288,6 +302,35 @@ fn eval_call_expression(
         env,
     )?;
     apply_function(func, args, env)
+}
+
+fn eval_index_expression(
+    node: ast::IndexExpression,
+    env: &mut object::EnvStack,
+) -> EResult<object::ObjectRc> {
+    let left = eval_expression(*node.left, env)?;
+    let left = &*left.borrow();
+    if let object::Object::Array(left) = left {
+        let max = left.elements.len() as i64;
+        let index_node = *node.index.expect("Unchecked Parse Error!");
+        let index = eval_expression(index_node, env)?;
+        let index = &*index.borrow();
+
+        if let object::Object::Int(index) = index {
+            let index = *index;
+            if index < 0 || index >= max {
+                Ok(Rc::new(RefCell::new(NULL)))
+            } else {
+                Ok(left.elements[index as usize].clone())
+            }
+        } else {
+            Ok(Rc::new(RefCell::new(NULL)))
+        }
+    } else {
+        Err(EvalError::IndexOpWrongType {
+            left_type: left.type_(),
+        })
+    }
 }
 
 fn eval_expressions(
