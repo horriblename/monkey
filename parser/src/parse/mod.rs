@@ -144,6 +144,10 @@ impl Parser {
         &self.errors
     }
 
+    pub fn take_errors(&mut self) -> Vec<ParseError> {
+        std::mem::replace(&mut self.errors, vec![])
+    }
+
     fn parse_statement(&mut self) -> Option<ast::Statement> {
         match self.curr_token.type_ {
             TokenType::Let => Some(ast::Statement::Let(self.parse_let_statement())),
