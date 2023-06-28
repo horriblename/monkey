@@ -26,13 +26,14 @@ pub enum ObjectType {
 // ```
 //
 // reflection is used to differentiate between Objects
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Object {
     Int(i64),
     Bool(bool),
     String(String),
     Null,
     Array(Array),
+    // cloning Rc might bite me in the ass some day
     ReturnValue(ObjectRc),
     Function(Function),
     BuiltinFunc(Builtin),
@@ -100,12 +101,12 @@ impl PartialEq for Object {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Array {
     pub elements: Vec<ObjectRc>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
     pub parameters: Vec<ast::Identifier>,
     pub body: ast::BlockStatement,
@@ -113,6 +114,7 @@ pub struct Function {
     pub env: Environment,
 }
 
+#[derive(Clone)]
 pub struct Builtin {
     func: &'static builtins::BuiltinFuncSignature,
 }
@@ -122,7 +124,7 @@ impl Builtin {
         builtins::get_builtin(name).map(|func| Builtin { func })
     }
 
-    pub fn call(&self, args: &Vec<ObjectRc>) -> EResult<Object> {
+    pub fn call(&self, args: &Vec<ObjectRc>) -> EResult<ObjectRc> {
         (self.func)(args)
     }
 }

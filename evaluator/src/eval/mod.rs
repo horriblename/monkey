@@ -356,7 +356,7 @@ fn apply_function(
     env: &mut object::EnvStack,
 ) -> EResult<object::ObjectRc> {
     match &*func.borrow() {
-        object::Object::BuiltinFunc(func) => Ok(Rc::new(RefCell::new(func.call(&args)?))),
+        object::Object::BuiltinFunc(func) => Ok(func.call(&args)?),
         object::Object::Function(func) => {
             extend_function_env(func, args, env);
             let evaluated = eval_block_statement(func.body.clone(), env)?;
