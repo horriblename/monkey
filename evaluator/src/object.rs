@@ -110,7 +110,6 @@ pub struct Array {
 pub struct Function {
     pub parameters: Vec<ast::Identifier>,
     pub body: ast::BlockStatement,
-    // TODO: remove Option
     pub env: Environment,
 }
 
