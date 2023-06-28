@@ -33,6 +33,7 @@ pub enum Expression {
     Bool(BooleanLiteral),
     String(StringLiteral),
     Array(ArrayLiteral),
+    Hash(HashLiteral),
     PrefixExpr(PrefixExpression),
     InfixExpr(InfixExpression),
     IfExpr(IfExpression),
@@ -87,6 +88,14 @@ pub struct StringLiteral {
 pub struct ArrayLiteral {
     pub token: Token, // the '[' token
     pub elements: Vec<Option<Expression>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HashLiteral {
+    pub token: Token, // the '{' token
+    // NOTE: in the book, HashMap<Expression, Expression> was used.
+    // I don't want to impl Hash for Expression so we're using Vecs
+    pub pairs: Vec<(Option<Expression>, Option<Expression>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -155,9 +164,9 @@ pub mod representation {
 
     use super::{
         ArrayLiteral, BlockStatement, BooleanLiteral, CallExpression, Expression,
-        ExpressionStatement, FunctionLiteral, Identifier, IfExpression, IndexExpression,
-        InfixExpression, IntegerLiteral, LetStatement, Node, PrefixExpression, Program,
-        ReturnStatement, Statement, StringLiteral,
+        ExpressionStatement, FunctionLiteral, HashLiteral, Identifier, IfExpression,
+        IndexExpression, InfixExpression, IntegerLiteral, LetStatement, Node, PrefixExpression,
+        Program, ReturnStatement, Statement, StringLiteral,
     };
 
     pub trait StringRepr {
@@ -203,6 +212,7 @@ pub mod representation {
                 Self::Bool(b) => b.string_repr(),
                 Self::String(s) => s.string_repr(),
                 Self::Array(a) => a.string_repr(),
+                Self::Hash(hash) => hash.string_repr(),
                 Self::PrefixExpr(expr) => expr.string_repr(),
                 Self::InfixExpr(expr) => expr.string_repr(),
                 Self::IfExpr(expr) => expr.string_repr(),
@@ -298,6 +308,25 @@ pub mod representation {
             s.push(']');
 
             s
+        }
+    }
+
+    impl StringRepr for HashLiteral {
+        fn string_repr(&self) -> String {
+            let pairs = self
+                .pairs
+                .iter()
+                .map(|(key, val)| {
+                    format!(
+                        "{}: {}",
+                        key.as_ref().unwrap().string_repr(),
+                        val.as_ref().unwrap().string_repr()
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            format!("{{{}}}", pairs)
         }
     }
 

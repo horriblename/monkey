@@ -40,6 +40,7 @@ pub enum TokenType {
     NotEqual,
     LessThan,
     GreaterThan,
+    Colon,
 
     // Comments
     // CommentMarker,

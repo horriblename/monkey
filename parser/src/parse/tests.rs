@@ -849,8 +849,6 @@ fn test_parsing_index_expressions() {
     let program = parser.parse_program();
     check_parse_errors(&parser);
 
-    dbg!(&program.statements);
-
     assert_eq!(1, program.statements.len());
 
     let stmt = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
@@ -865,4 +863,80 @@ fn test_parsing_index_expressions() {
         &LiteralValue::Int(1),
     )
     .unwrap();
+}
+
+#[test]
+fn test_parsing_hash_literal() {
+    let input = r#"{"one": 1, "two": 2, "three": 3}"#;
+    let lexer = Lexer::new(input.to_string());
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    let stmt = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
+    let expr = &**stmt.expr.as_ref().unwrap();
+    let hash = cast_variant!(expr, Expression::Hash).unwrap();
+
+    assert_eq!(hash.pairs.len(), 3);
+
+    let expected = |key: &str| match key {
+        "one" => 1,
+        "two" => 2,
+        "three" => 3,
+        _ => panic!("unexpected key!"),
+    };
+
+    for (k, v) in &hash.pairs {
+        let literal = cast_variant!(k.as_ref().unwrap(), Expression::String).unwrap();
+
+        let expected_value = expected(&literal.value);
+
+        test_integer_literal(v.as_ref().unwrap(), &expected_value).unwrap();
+    }
+}
+
+#[test]
+fn test_parsing_empty_hash_literal() {
+    let input = "{}";
+    let lexer = Lexer::new(input.to_string());
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    let stmt = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
+    let expr = &**stmt.expr.as_ref().unwrap();
+    let hash = cast_variant!(expr, Expression::Hash).unwrap();
+
+    assert_eq!(hash.pairs.len(), 0);
+}
+
+#[test]
+fn test_parsing_hash_literals_with_expressions() {
+    let input = r#"{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}"#;
+    let lexer = Lexer::new(input.to_string());
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    check_parse_errors(&parser);
+
+    let stmt = cast_variant!(&program.statements[0], Statement::Expr).unwrap();
+    let expr = &**stmt.expr.as_ref().unwrap();
+    let hash = cast_variant!(expr, Expression::Hash).unwrap();
+
+    assert_eq!(hash.pairs.len(), 3);
+
+    let test = |key: &str, val: &Expression| {
+        let wrap = |n| LiteralValue::Int(n);
+        match key {
+            "one" => test_infix_expression(val, &wrap(0), "+", &wrap(1)),
+            "two" => test_infix_expression(val, &wrap(10), "-", &wrap(8)),
+            "three" => test_infix_expression(val, &wrap(15), "/", &wrap(5)),
+            _ => panic!("unexpected key!"),
+        }
+    };
+
+    for (k, v) in &hash.pairs {
+        let literal = cast_variant!(k.as_ref().unwrap(), Expression::String).unwrap();
+
+        test(&literal.value, v.as_ref().unwrap()).unwrap();
+    }
 }

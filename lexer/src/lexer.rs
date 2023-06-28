@@ -46,6 +46,7 @@ impl Lexer {
             Some(b'+') => new_token(TokenType::Plus, '+'),
             Some(b'-') => new_token(TokenType::Minus, '-'),
             Some(b'*') => new_token(TokenType::Asterisk, '*'),
+            Some(b':') => new_token(TokenType::Colon, ':'),
             Some(b'<') => new_token(TokenType::LessThan, '<'),
             Some(b'>') => new_token(TokenType::GreaterThan, '>'),
             Some(b'{') => new_token(TokenType::LBrace, '{'),
@@ -221,6 +222,7 @@ mod tests {
 
             let s = "A String Literal";
             [1, 2];
+            {"foo": "bar"}
             "#;
 
         struct Expected {
@@ -314,6 +316,11 @@ mod tests {
             expect(Int, "2"),
             expect(RBracket, "]"),
             expect(Semicolon, ";"),
+            expect(LBrace, "{"),
+            expect(String, "foo"),
+            expect(Colon, ":"),
+            expect(String, "bar"),
+            expect(RBrace, "}"),
             expect(EOF, ""),
         ];
 

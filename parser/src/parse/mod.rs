@@ -264,6 +264,7 @@ impl Parser {
             }
             TokenType::LParen => self.parse_grouped_expression(),
             TokenType::LBracket => self.parse_array_literal().map(ast::Expression::Array),
+            TokenType::LBrace => self.parse_hash_literal().map(ast::Expression::Hash),
             TokenType::Ident => Some(ast::Expression::Ident(self.parse_identifier())),
             TokenType::Int => Some(ast::Expression::Int(self.parse_int())),
             TokenType::True | TokenType::False => Some(ast::Expression::Bool(self.parse_bool())),
@@ -327,6 +328,44 @@ impl Parser {
         self.expect_next(TokenType::RBracket)?;
 
         Some(elements)
+    }
+
+    fn parse_hash_literal(&mut self) -> Option<ast::HashLiteral> {
+        let token = self.next_token();
+        let pairs = self.parse_expression_pairs(TokenType::RBrace)?;
+
+        Some(ast::HashLiteral { token, pairs })
+    }
+
+    fn parse_expression_pairs(
+        &mut self,
+        end: TokenType,
+    ) -> Option<Vec<(Option<ast::Expression>, Option<ast::Expression>)>> {
+        let mut pairs = vec![];
+
+        if self.curr_token_is(end) {
+            self.next_token();
+            return Some(pairs);
+        }
+
+        let key = self.parse_expression(OperatorPrecedence::Lowest);
+        self.expect_next(TokenType::Colon)?;
+        let value = self.parse_expression(OperatorPrecedence::Lowest);
+
+        pairs.push((key, value));
+
+        while self.curr_token_is(TokenType::Comma) {
+            self.next_token(); // eat comma
+            let key = self.parse_expression(OperatorPrecedence::Lowest);
+            self.expect_next(TokenType::Colon)?;
+            let value = self.parse_expression(OperatorPrecedence::Lowest);
+
+            pairs.push((key, value));
+        }
+
+        self.expect_next(TokenType::RBrace);
+
+        Some(pairs)
     }
 
     // replaces `Parser.prefixParseFns` in the book
