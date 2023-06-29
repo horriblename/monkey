@@ -674,11 +674,60 @@ fn test_hash_literals() {
         _ => panic!("unexpected key!"),
     };
 
-    assert_eq!(hash.pairs.len(), 6);
+    assert_eq!(hash.len(), 6);
 
-    for (key, val) in &hash.pairs {
+    for (key, val) in hash.iter() {
         let expected_val = expected(key);
         let val = &*val.borrow();
         test_integer_object(val, expected_val).unwrap();
+    }
+}
+
+#[test]
+fn test_hash_index_expressions() {
+    struct Test {
+        input: &'static str,
+        expected: Option<i64>,
+    }
+
+    let tests = vec![
+        Test {
+            input: r#"{"foo": 5}["foo"]"#,
+            expected: Some(5),
+        },
+        Test {
+            input: r#"{"foo": 5}["bar"]"#,
+            expected: None,
+        },
+        Test {
+            input: r#"let key = "foo"; {"foo": 5}[key]"#,
+            expected: Some(5),
+        },
+        Test {
+            input: r#"{}["foo"]"#,
+            expected: None,
+        },
+        Test {
+            input: r#"{5: 5}[5]"#,
+            expected: Some(5),
+        },
+        Test {
+            input: r#"{true: 5}[true]"#,
+            expected: Some(5),
+        },
+        Test {
+            input: r#"{false: 5}[false]"#,
+            expected: Some(5),
+        },
+    ];
+
+    for test in tests {
+        let evaluated = test_eval(test.input).unwrap();
+        let evaluated = &*evaluated.borrow();
+        if let Some(n) = test.expected {
+            test_integer_object(evaluated, n).unwrap();
+        } else {
+            test_null_object(evaluated).unwrap();
+        }
     }
 }

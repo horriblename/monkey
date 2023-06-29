@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use parser::ast;
 
@@ -105,7 +105,7 @@ fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult
             ))))
         }
         ast::Expression::Hash(node) => {
-            let mut hash_map = HashMap::new();
+            let mut hash_table = object::Hash::new();
             for (k, v) in node.pairs {
                 let k = k.expect("Unchecked Parse Error!");
                 // I hate this
@@ -113,12 +113,10 @@ fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult
                     .map_or_else(|err| err.borrow().clone(), |ok| ok.into_inner());
                 let val = eval_expression(v.expect("Unchecked Parse Error!"), env)?;
 
-                hash_map.insert(key, val);
+                hash_table.insert(key, val);
             }
 
-            Ok(Rc::new(RefCell::new(object::Object::Hash(object::Hash {
-                pairs: hash_map,
-            }))))
+            Ok(Rc::new(RefCell::new(object::Object::Hash(hash_table))))
         }
         ast::Expression::PrefixExpr(node) => {
             let right_ = node.operand.expect("Unchecked Parse Error!");
@@ -326,26 +324,36 @@ fn eval_index_expression(
 ) -> EResult<object::ObjectRc> {
     let left = eval_expression(*node.left, env)?;
     let left = &*left.borrow();
-    if let object::Object::Array(left) = left {
-        let max = left.elements.len() as i64;
-        let index_node = *node.index.expect("Unchecked Parse Error!");
-        let index = eval_expression(index_node, env)?;
-        let index = &*index.borrow();
+    match left {
+        object::Object::Array(left) => {
+            let max = left.elements.len() as i64;
+            let index_node = *node.index.expect("Unchecked Parse Error!");
+            let index = eval_expression(index_node, env)?;
+            let index = &*index.borrow();
 
-        if let object::Object::Int(index) = index {
-            let index = *index;
-            if index < 0 || index >= max {
-                Ok(Rc::new(RefCell::new(NULL)))
+            if let object::Object::Int(index) = index {
+                let index = *index;
+                if index < 0 || index >= max {
+                    Ok(Rc::new(RefCell::new(NULL)))
+                } else {
+                    Ok(left.elements[index as usize].clone())
+                }
             } else {
-                Ok(left.elements[index as usize].clone())
+                Ok(Rc::new(RefCell::new(NULL)))
             }
-        } else {
-            Ok(Rc::new(RefCell::new(NULL)))
         }
-    } else {
-        Err(EvalError::IndexOpWrongType {
+        object::Object::Hash(left) => {
+            let index_node = *node.index.expect("Unchecked Parse Error!");
+            let index = eval_expression(index_node, env)?;
+            let index = &*index.borrow();
+
+            Ok(left
+                .get(index)
+                .unwrap_or_else(|| Rc::new(RefCell::new(NULL))))
+        }
+        _ => Err(EvalError::IndexOpWrongType {
             left_type: left.type_(),
-        })
+        }),
     }
 }
 

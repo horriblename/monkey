@@ -1,5 +1,10 @@
 use parser::ast::{self, representation::StringRepr};
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{hash_map, HashMap},
+    fmt::Debug,
+    rc::Rc,
+};
 
 use crate::{builtins, error::EResult};
 
@@ -143,7 +148,41 @@ pub struct Array {
 
 #[derive(Debug, Clone)]
 pub struct Hash {
-    pub pairs: HashMap<Object, ObjectRc>,
+    pairs: HashMap<Object, ObjectRc>,
+}
+
+impl Hash {
+    pub fn new() -> Self {
+        Self {
+            pairs: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, key: Object, value: ObjectRc) {
+        use Object::*;
+        match key {
+            key @ (Int(_) | Bool(_) | String(_) | Null) => {
+                self.pairs.insert(key, value);
+            }
+            _ => todo!("error handling: unhashable key"),
+        }
+    }
+
+    pub fn get(&self, key: &Object) -> Option<ObjectRc> {
+        use Object::*;
+        match key {
+            key @ (Int(_) | Bool(_) | String(_) | Null) => self.pairs.get(key).map(Rc::clone),
+            _ => todo!("error handling: unhashable key"),
+        }
+    }
+
+    pub fn iter(&self) -> hash_map::Iter<Object, ObjectRc> {
+        self.pairs.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.pairs.len()
+    }
 }
 
 #[derive(Debug, Clone)]
