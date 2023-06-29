@@ -11,6 +11,7 @@ pub fn get_builtin(name: &str) -> Option<&'static BuiltinFuncSignature> {
         "last" => Some(&last),
         "rest" => Some(&rest),
         "push" => Some(&push),
+        "puts" => Some(&puts),
         _ => None,
     }
 }
@@ -112,6 +113,14 @@ fn push(args: &Vec<object::ObjectRc>) -> EResult<object::ObjectRc> {
     Ok(new_rc_refcell(object::Object::Array(object::Array {
         elements: new_elements,
     })))
+}
+
+fn puts(args: &Vec<object::ObjectRc>) -> EResult<object::ObjectRc> {
+    for arg in args {
+        println!("{}", arg.borrow().inspect())
+    }
+
+    Ok(new_rc_refcell(object::Object::Null))
 }
 
 // -----------------
