@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use parser::ast;
 
@@ -103,6 +103,22 @@ fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult
             Ok(Rc::new(RefCell::new(object::Object::Array(
                 object::Array { elements },
             ))))
+        }
+        ast::Expression::Hash(node) => {
+            let mut hash_map = HashMap::new();
+            for (k, v) in node.pairs {
+                let k = k.expect("Unchecked Parse Error!");
+                // I hate this
+                let key = Rc::try_unwrap(eval_expression(k, env)?)
+                    .map_or_else(|err| err.borrow().clone(), |ok| ok.into_inner());
+                let val = eval_expression(v.expect("Unchecked Parse Error!"), env)?;
+
+                hash_map.insert(key, val);
+            }
+
+            Ok(Rc::new(RefCell::new(object::Object::Hash(object::Hash {
+                pairs: hash_map,
+            }))))
         }
         ast::Expression::PrefixExpr(node) => {
             let right_ = node.operand.expect("Unchecked Parse Error!");

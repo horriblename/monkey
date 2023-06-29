@@ -10,6 +10,7 @@ pub enum ObjectType {
     String,
     Null,
     Array,
+    Hash,
     ReturnValue,
     Function,
     BuiltinFunc,
@@ -33,6 +34,7 @@ pub enum Object {
     String(String),
     Null,
     Array(Array),
+    Hash(Hash),
     // cloning Rc might bite me in the ass some day
     ReturnValue(ObjectRc),
     Function(Function),
@@ -58,6 +60,16 @@ impl Object {
 
                 format!("[{}]", elements)
             }
+            Self::Hash(h) => {
+                let elements = h
+                    .pairs
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k.inspect(), v.borrow().inspect()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                format!("{{{}}}", elements)
+            }
             Self::ReturnValue(val) => val.borrow().inspect(),
             Self::Function(val) => {
                 let params = val
@@ -81,6 +93,7 @@ impl Object {
             Self::String(_) => ObjectType::String,
             Self::Null => ObjectType::Null,
             Self::Array(_) => ObjectType::Array,
+            Self::Hash(_) => ObjectType::Hash,
             Self::ReturnValue(_) => ObjectType::ReturnValue,
             Self::Function(_) => ObjectType::Function,
             Self::BuiltinFunc(_) => ObjectType::BuiltinFunc,
@@ -88,6 +101,7 @@ impl Object {
     }
 }
 
+impl Eq for Object {}
 impl PartialEq for Object {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -95,15 +109,41 @@ impl PartialEq for Object {
             (Self::Bool(x), Self::Bool(y)) => x == y,
             (Self::Null, Self::Null) => true,
             (Self::String(x), Self::String(y)) => x == y,
-            (Self::ReturnValue(x), Self::ReturnValue(y)) => x == y,
+            // (Self::ReturnValue(x), Self::ReturnValue(y)) => x == y,
             _ => false,
         }
+    }
+}
+
+impl std::hash::Hash for Object {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Object::Int(n) => n.hash(state),
+            Object::Bool(n) => n.hash(state),
+            Object::String(s) => s.hash(state),
+            Object::Null => 0.hash(state),
+            // O(n) operation defeats the point of hashing?
+            Object::Array(arr) => arr.elements.iter().for_each(|el| el.borrow().hash(state)),
+            // FIXME: HashMap.iter() is NOT guaranteed order!
+            Object::Hash(h) => h.pairs.iter().for_each(|(k, v)| {
+                k.hash(state);
+                v.borrow().hash(state)
+            }),
+            Object::ReturnValue(_) => todo!(),
+            Object::Function(_) => todo!(),
+            Object::BuiltinFunc(_) => todo!(),
+        };
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Array {
     pub elements: Vec<ObjectRc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Hash {
+    pub pairs: HashMap<Object, ObjectRc>,
 }
 
 #[derive(Debug, Clone)]

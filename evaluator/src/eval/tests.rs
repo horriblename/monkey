@@ -646,3 +646,39 @@ fn test_array_index_expression() {
         }
     }
 }
+
+#[test]
+fn test_hash_literals() {
+    let input = r#"
+        let two = "two";
+        {
+            "one": 10 - 9,
+            two: 1 + 1,
+            "thr" + "ee": 6 / 2,
+            4: 4,
+            true: 5,
+            false: 6
+        }"#;
+
+    let evaluated = test_eval(input).unwrap();
+    let evaluated = &*evaluated.borrow();
+    let hash = cast_variant!(evaluated, object::Object::Hash).unwrap();
+
+    let expected = |key: &object::Object| match key {
+        object::Object::String(s) if s == "one" => 1,
+        object::Object::String(s) if s == "two" => 2,
+        object::Object::String(s) if s == "three" => 3,
+        object::Object::Int(4) => 4,
+        object::Object::Bool(true) => 5,
+        object::Object::Bool(false) => 6,
+        _ => panic!("unexpected key!"),
+    };
+
+    assert_eq!(hash.pairs.len(), 6);
+
+    for (key, val) in &hash.pairs {
+        let expected_val = expected(key);
+        let val = &*val.borrow();
+        test_integer_object(val, expected_val).unwrap();
+    }
+}
