@@ -185,11 +185,24 @@ impl Hash {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Function {
     pub parameters: Vec<ast::Identifier>,
     pub body: ast::BlockStatement,
-    pub env: Environment,
+    pub env: Rc<RefCell<EnvStack>>,
+}
+
+impl Debug for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let params = self
+            .parameters
+            .iter()
+            .map(|ident| ident.string_repr())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        write!(f, "fn({}) {{...}}", params)
+    }
 }
 
 #[derive(Clone)]
@@ -214,67 +227,85 @@ impl Debug for Builtin {
 }
 
 #[derive(Debug, Clone)]
-pub struct Environment {
+struct Environment {
     store: HashMap<String, Rc<RefCell<Object>>>,
 }
 
 // #[derive(Debug, Clone)]
 // TODO: enforce rule of always having at least one Environment on stack
 pub struct EnvStack {
-    stack: Vec<Environment>,
+    env: Environment,
+    up: Option<Rc<RefCell<EnvStack>>>,
 }
 
 impl Environment {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Environment {
             store: HashMap::new(),
         }
     }
 
-    // I'm debating removing this function
-    pub fn new_enclosed_environment(outer: &Self) -> Self {
-        outer.clone()
-    }
-
-    pub fn get(&self, name: &str) -> Option<Rc<RefCell<Object>>> {
+    fn get(&self, name: &str) -> Option<Rc<RefCell<Object>>> {
         self.store.get(name).map(|var| var.clone())
     }
 
-    pub fn set(&mut self, name: String, val: Rc<RefCell<Object>>) -> Rc<RefCell<Object>> {
+    fn set(&mut self, name: String, val: Rc<RefCell<Object>>) -> Rc<RefCell<Object>> {
         self.store.insert(name, val.clone());
         val
+    }
+
+    fn contains_key(&self, name: &str) -> bool {
+        self.store.contains_key(name)
     }
 }
 
 impl EnvStack {
     pub fn new() -> Self {
         EnvStack {
-            stack: vec![Environment::new()],
+            env: Environment::new(),
+            up: None,
         }
     }
 
-    pub fn new_enclosed_environment(&mut self) -> &mut Self {
-        self.stack.push(Environment::new());
-        self
-    }
-
-    pub fn pop(&mut self) -> Environment {
-        debug_assert!(self.stack.len() >= 2);
-        self.stack.pop().expect("empty EnvStack!")
+    pub fn new_enclosed_environment(this: &Rc<RefCell<EnvStack>>) -> Self {
+        EnvStack {
+            env: Environment::new(),
+            up: Some(this.clone()),
+        }
     }
 
     pub fn get(&self, name: &str) -> Option<Rc<RefCell<Object>>> {
-        self.stack.iter().rev().find_map(|env| env.get(name))
+        if let val @ Some(_) = self.env.get(name) {
+            return val;
+        }
+
+        if let Some(up) = &self.up {
+            up.borrow().get(name)
+        } else {
+            None
+        }
     }
 
-    pub fn set(&mut self, name: String, val: Rc<RefCell<Object>>) -> Rc<RefCell<Object>> {
-        self.stack
-            .last_mut()
-            .expect("empty EnvStack!")
-            .set(name, val)
+    pub fn set(&mut self, name: &str, val: Rc<RefCell<Object>>) -> ObjectRc {
+        if let Some(obj) = self.find_and_set(name, &val) {
+            return obj;
+        }
+
+        self.env.set(name.to_string(), val)
     }
 
-    pub fn peek(&self) -> &Environment {
-        self.stack.last().expect("empty EnvStack!")
+    /// Goes up the stack and finds the variable named `name` and set its value.
+    /// Returns None if no such variable is found
+    fn find_and_set(&mut self, name: &str, val: &Rc<RefCell<Object>>) -> Option<ObjectRc> {
+        if self.env.contains_key(name) {
+            self.env.set(name.to_string(), val.clone());
+            return Some(val.clone());
+        }
+
+        self.up
+            .as_ref()?
+            .try_borrow_mut()
+            .expect("unreachable")
+            .find_and_set(name, val)
     }
 }

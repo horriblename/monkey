@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{error::EResult, object};
 use lexer::lexer::Lexer;
@@ -79,9 +79,9 @@ fn test_eval(input: &str) -> EResult<object::ObjectRc> {
     let lexer = Lexer::new(input.to_string());
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();
-    let mut env = object::EnvStack::new();
+    let env = Rc::new(RefCell::new(object::EnvStack::new()));
 
-    return super::eval(ast::Node::Prog(program), &mut env);
+    return super::eval(ast::Node::Prog(program), env);
 }
 
 fn test_integer_object(obj: &object::Object, expected: i64) -> TResult<()> {

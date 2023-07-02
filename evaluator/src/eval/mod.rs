@@ -16,7 +16,7 @@ const NULL: object::Object = object::Object::Null;
 
 // TODO: should be Option<_> (according to the book)
 // FIXME: wrapping all eval return Objects with Rc<RefCell<>> cuz idk how to do things properly
-pub fn eval(node: ast::Node, env: &mut object::EnvStack) -> EResult<object::ObjectRc> {
+pub fn eval(node: ast::Node, env: Rc<RefCell<object::EnvStack>>) -> EResult<object::ObjectRc> {
     match node {
         ast::Node::Prog(program) => eval_program(program, env),
         ast::Node::Stmt(stmt) => eval_statement(stmt, env),
@@ -24,12 +24,15 @@ pub fn eval(node: ast::Node, env: &mut object::EnvStack) -> EResult<object::Obje
     }
 }
 
-fn eval_program(program: ast::Program, env: &mut object::EnvStack) -> EResult<object::ObjectRc> {
+fn eval_program(
+    program: ast::Program,
+    env: Rc<RefCell<object::EnvStack>>,
+) -> EResult<object::ObjectRc> {
     let stmts = program.statements;
     let mut res = None;
 
     for stmt in stmts {
-        let val = eval_statement(stmt, env)?;
+        let val = eval_statement(stmt, env.clone())?;
         if let object::Object::ReturnValue(returned) = &*val.borrow() {
             return Ok(returned.clone());
         }
@@ -41,13 +44,13 @@ fn eval_program(program: ast::Program, env: &mut object::EnvStack) -> EResult<ob
 
 fn eval_block_statement(
     block: ast::BlockStatement,
-    env: &mut object::EnvStack,
+    env: Rc<RefCell<object::EnvStack>>,
 ) -> EResult<object::ObjectRc> {
     let stmts = block.statements;
     let mut res = None;
 
     for stmt in stmts {
-        let val = eval_statement(*stmt, env)?;
+        let val = eval_statement(*stmt, env.clone())?;
         if let object::Object::ReturnValue(_) = &*val.borrow() {
             return Ok(val.clone());
         }
@@ -57,7 +60,10 @@ fn eval_block_statement(
     Ok(res.expect("TODO: handle statements of length 0"))
 }
 
-fn eval_statement(stmt: ast::Statement, env: &mut object::EnvStack) -> EResult<object::ObjectRc> {
+fn eval_statement(
+    stmt: ast::Statement,
+    env: Rc<RefCell<object::EnvStack>>,
+) -> EResult<object::ObjectRc> {
     match stmt {
         ast::Statement::Expr(expr) => {
             eval_expression(*expr.expr.expect("Unchecked Parse Error!"), env)
@@ -67,14 +73,16 @@ fn eval_statement(stmt: ast::Statement, env: &mut object::EnvStack) -> EResult<o
             Ok(Rc::new(RefCell::new(object::Object::ReturnValue(value))))
         }
         ast::Statement::Let(let_stmt) => {
-            let val = eval_expression(*let_stmt.value.expect("Unchecked Parse Error!"), env)?;
-            let var = env.set(
-                let_stmt
+            let val = eval_expression(
+                *let_stmt.value.expect("Unchecked Parse Error!"),
+                env.clone(),
+            )?;
+            let var = env.borrow_mut().set(
+                &let_stmt
                     .name
                     .as_ref()
                     .expect("Unchecked Parse Error!")
-                    .value
-                    .clone(),
+                    .value,
                 val,
             );
             Ok(var)
@@ -85,7 +93,10 @@ fn eval_statement(stmt: ast::Statement, env: &mut object::EnvStack) -> EResult<o
     }
 }
 
-fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult<object::ObjectRc> {
+fn eval_expression(
+    expr: ast::Expression,
+    env: Rc<RefCell<object::EnvStack>>,
+) -> EResult<object::ObjectRc> {
     match expr {
         ast::Expression::Int(node) => Ok(Rc::new(RefCell::new(object::Object::Int(node.value)))),
         // TODO: return const TRUE/FALSE to reduce object creations
@@ -109,9 +120,9 @@ fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult
             for (k, v) in node.pairs {
                 let k = k.expect("Unchecked Parse Error!");
                 // I hate this
-                let key = Rc::try_unwrap(eval_expression(k, env)?)
+                let key = Rc::try_unwrap(eval_expression(k, env.clone())?)
                     .map_or_else(|err| err.borrow().clone(), |ok| ok.into_inner());
-                let val = eval_expression(v.expect("Unchecked Parse Error!"), env)?;
+                let val = eval_expression(v.expect("Unchecked Parse Error!"), env.clone())?;
 
                 hash_table.insert(key, val);
             }
@@ -125,7 +136,7 @@ fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult
             eval_prefix_expression(&node.operator.literal, &right_borrow)
         }
         ast::Expression::InfixExpr(node) => {
-            let left_ = eval_expression(*node.left_expr, env)?;
+            let left_ = eval_expression(*node.left_expr, env.clone())?;
             let left = left_.borrow();
             let right_ = eval_expression(*node.right_expr.expect("Unchecked Parse Error!"), env)?;
             let right = right_.borrow();
@@ -144,7 +155,7 @@ fn eval_expression(expr: ast::Expression, env: &mut object::EnvStack) -> EResult
                 object::Function {
                     parameters,
                     body,
-                    env: env.peek().clone(),
+                    env: env.clone(),
                 },
             ))))
         }
@@ -261,9 +272,12 @@ fn native_bool_to_boolean_object(val: bool) -> EResult<object::ObjectRc> {
 
 fn eval_if_expression(
     if_expr: ast::IfExpression,
-    env: &mut object::EnvStack,
+    env: Rc<RefCell<object::EnvStack>>,
 ) -> EResult<object::ObjectRc> {
-    let condition = eval_expression(*if_expr.condition.expect("Unchecked Parse Error!"), env)?;
+    let condition = eval_expression(
+        *if_expr.condition.expect("Unchecked Parse Error!"),
+        env.clone(),
+    )?;
 
     if is_truthy(&condition.borrow()) {
         let consequence = if_expr.consequence;
@@ -288,13 +302,13 @@ fn is_truthy(condition: &object::Object) -> bool {
 
 fn eval_identifier(
     ident: ast::Identifier,
-    env: &mut object::EnvStack,
+    env: Rc<RefCell<object::EnvStack>>,
 ) -> EResult<object::ObjectRc> {
     if let Some(func) = object::Builtin::from_func_name(&ident.value) {
         return Ok(Rc::new(RefCell::new(object::Object::BuiltinFunc(func))));
     }
 
-    if let Some(var) = env.get(&ident.value) {
+    if let Some(var) = env.borrow().get(&ident.value) {
         Ok(var)
     } else {
         Err(EvalError::UnknownIdent(UnknownIdentifier {
@@ -305,24 +319,24 @@ fn eval_identifier(
 
 fn eval_call_expression(
     node: ast::CallExpression,
-    env: &mut object::EnvStack,
+    env: Rc<RefCell<object::EnvStack>>,
 ) -> EResult<object::ObjectRc> {
-    let func = eval_expression(*node.function, env)?;
+    let func = eval_expression(*node.function, env.clone())?;
     let args = eval_expressions(
         node.arguments
             .into_iter()
             .map(|arg| *arg.expect("Unchecked Parse Error!"))
             .collect::<Vec<_>>(),
-        env,
+        env.clone(),
     )?;
     apply_function(func, args, env)
 }
 
 fn eval_index_expression(
     node: ast::IndexExpression,
-    env: &mut object::EnvStack,
+    env: Rc<RefCell<object::EnvStack>>,
 ) -> EResult<object::ObjectRc> {
-    let left = eval_expression(*node.left, env)?;
+    let left = eval_expression(*node.left, env.clone())?;
     let left = &*left.borrow();
     match left {
         object::Object::Array(left) => {
@@ -359,12 +373,12 @@ fn eval_index_expression(
 
 fn eval_expressions(
     exprs: Vec<ast::Expression>,
-    env: &mut object::EnvStack,
+    env: Rc<RefCell<object::EnvStack>>,
 ) -> EResult<Vec<object::ObjectRc>> {
     let mut res = Vec::with_capacity(exprs.len());
 
     for expr in exprs {
-        let val = eval_expression(expr, env)?;
+        let val = eval_expression(expr, env.clone())?;
         res.push(val);
     }
 
@@ -377,14 +391,13 @@ fn eval_expressions(
 fn apply_function(
     func: object::ObjectRc,
     args: Vec<object::ObjectRc>,
-    env: &mut object::EnvStack,
+    env: Rc<RefCell<object::EnvStack>>,
 ) -> EResult<object::ObjectRc> {
     match &*func.borrow() {
         object::Object::BuiltinFunc(func) => Ok(func.call(&args)?),
         object::Object::Function(func) => {
-            extend_function_env(func, args, env);
+            extend_function_env(func, args, env.clone());
             let evaluated = eval_block_statement(func.body.clone(), env)?;
-            env.pop(); // FIXME wow this is so bad
             Ok(unwrap_return_value(evaluated))
         }
         x => Err(error::EvalError::NotAFunction(error::NotAFunction {
@@ -396,12 +409,12 @@ fn apply_function(
 fn extend_function_env(
     func: &object::Function,
     args: Vec<object::ObjectRc>,
-    env: &mut object::EnvStack,
+    env: Rc<RefCell<object::EnvStack>>,
 ) {
-    env.new_enclosed_environment();
+    object::EnvStack::new_enclosed_environment(&env);
 
     for (arg_name, arg) in func.parameters.iter().zip(args) {
-        env.set(arg_name.value.clone(), arg);
+        env.borrow_mut().set(&arg_name.value, arg);
     }
 }
 

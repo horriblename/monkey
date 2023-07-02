@@ -5,9 +5,11 @@ const PROMPT: &str = "> ";
 use lexer::lexer;
 use parser::{ast, parse};
 use std::{
+    cell::RefCell,
     fs,
     io::{self, Write},
     path::PathBuf,
+    rc::Rc,
 };
 
 #[inline]
@@ -26,12 +28,12 @@ fn print_parse_errors(errors: &Vec<parse::ParseError>) {
 
 fn main() {
     println!("Welcome to the Monkey programming language!");
-    let mut env = evaluator::object::EnvStack::new();
+    let env = Rc::new(RefCell::new(evaluator::object::EnvStack::new()));
 
     let config = args::read_args().unwrap();
 
     if let Some(in_file) = config.in_file {
-        include_file(in_file, &mut env).unwrap();
+        include_file(in_file, env.clone()).unwrap();
     }
 
     loop {
@@ -59,7 +61,7 @@ fn main() {
             continue;
         }
 
-        let evaluated = evaluator::eval::eval(ast::Node::Prog(program), &mut env);
+        let evaluated = evaluator::eval::eval(ast::Node::Prog(program), env.clone());
         match &evaluated {
             Err(err) => eprintln!("Error: {:?}", err),
             Ok(evaluated) => println!("{}", evaluated.borrow().inspect()),
@@ -67,7 +69,10 @@ fn main() {
     }
 }
 
-fn include_file(file: PathBuf, env: &mut evaluator::object::EnvStack) -> Result<(), RError> {
+fn include_file(
+    file: PathBuf,
+    env: Rc<RefCell<evaluator::object::EnvStack>>,
+) -> Result<(), RError> {
     let contents = fs::read_to_string(file).map_err(RError::Io)?;
 
     let lexer = lexer::Lexer::new(contents);
