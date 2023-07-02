@@ -73,7 +73,7 @@ fn include_file(
     file: PathBuf,
     env: Rc<RefCell<evaluator::object::EnvStack>>,
 ) -> Result<(), RError> {
-    let contents = fs::read_to_string(file).map_err(RError::Io)?;
+    let contents = fs::read_to_string(&file).map_err(RError::Io)?;
 
     let lexer = lexer::Lexer::new(contents);
     let mut parser = parse::Parser::new(lexer);
@@ -88,7 +88,7 @@ fn include_file(
     let evaluated = evaluator::eval::eval(ast::Node::Prog(program), env);
     match &evaluated {
         Err(err) => eprintln!("Error: {:?}", err),
-        Ok(evaluated) => println!("{}", evaluated.borrow().inspect()),
+        Ok(_) => println!("sourced {:?}", file),
     }
 
     Ok(())
